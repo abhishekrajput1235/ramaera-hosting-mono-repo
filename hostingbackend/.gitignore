@@ -1,0 +1,36 @@
+# Environments
+.env
+.venv
+venv/
+env/
+
+# IDE
+.idea/
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# alembic
+alembic/versions/*.py
+
+# DB
+*.db
+*.sqlite3
+migrations/
+
+# Logs
+*.log
+
+# Other
+.DS_Store
+*.tmp
+*.swp
+
+# Docker
+docker-compose.yml
+Dockerfile
+.dockerignore

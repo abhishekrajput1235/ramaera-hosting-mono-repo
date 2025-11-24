@@ -1,0 +1,59 @@
+# ------------------------------
+# IDE
+# ------------------------------
+.idea/
+.vscode/
+
+# ------------------------------
+# OS
+# ------------------------------
+.DS_Store
+Thumbs.db
+
+# ------------------------------
+# Logs
+# ------------------------------
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# ------------------------------
+# Node / React (hostingfrontend)
+# ------------------------------
+hostingfrontend/node_modules/
+hostingfrontend/build/
+hostingfrontend/dist/
+
+# environment files
+hostingfrontend/.env
+hostingfrontend/.env.local
+
+# ------------------------------
+# Python / FastAPI (hostingbackend)
+# ------------------------------
+hostingbackend/__pycache__/
+hostingbackend/*.pyc
+hostingbackend/*.pyo
+hostingbackend/*.pyd
+
+hostingbackend/venv/
+hostingbackend/.venv/
+hostingbackend/env/
+hostingbackend/.env/
+
+# Database (if using sqlite for dev only)
+hostingbackend/*.db
+hostingbackend/*.sqlite3
+
+
+
+# env files
+hostingbackend/.env
+
+
+
+# ------------------------------
+# Common
+# ------------------------------
+.env
