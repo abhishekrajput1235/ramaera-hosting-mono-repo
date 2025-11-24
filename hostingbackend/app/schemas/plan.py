@@ -1,7 +1,8 @@
 from pydantic import BaseModel, validator
-from typing import Optional, Dict, Any, List
+from typing import Optional, List
 from datetime import datetime
 from decimal import Decimal
+import json
 
 class HostingPlanBase(BaseModel):
     name: str
@@ -59,6 +60,17 @@ class HostingPlan(HostingPlanBase):
     features: Optional[List[str]] = None
     created_at: datetime
     updated_at: Optional[datetime] = None
+
+    @validator('features', pre=True, always=True)
+    def validate_features(cls, v):
+        if v is None:
+            return []
+        if isinstance(v, str):
+            try:
+                return json.loads(v)
+            except json.JSONDecodeError:
+                return [v]
+        return v
 
     class Config:
         from_attributes = True

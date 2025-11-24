@@ -5,15 +5,19 @@ This populates hosting_plans table with all current pricing
 import asyncio
 import asyncpg
 import json
+from app.core.config import settings
 
 async def seed_pricing_data():
-    conn = await asyncpg.connect(
-        user='postgres',
-        password='hardik123',
-        database='ramaera_hosting',
-        host='localhost',
-        port=5432
-    )
+    # conn = await asyncpg.connect(
+    #     user='postgres',
+    #     password='hardik123',
+    #     database='ramaera_hosting',
+    #     host='localhost',
+    #     port=5432
+    # )
+    
+    database_url = settings.DATABASE_URL
+    conn = await asyncpg.connect(database_url.replace("postgresql+asyncpg", "postgresql"))
     
     print("🔄 Seeding pricing data...")
     

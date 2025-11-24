@@ -1,13 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, Server, Zap, Database, MapPin, Clock, Shield, Award, HardDrive, Cpu, MemoryStick, Network } from 'lucide-react';
+import {
+  CheckCircle,
+  Server,
+  Zap,
+  Database,
+  MapPin,
+  Clock,
+  Shield,
+  Award,
+  HardDrive,
+  Cpu,
+  MemoryStick,
+  Network,
+} from 'lucide-react';
 import { MobileFilters } from '../components/pricing/MobileFilters';
-import { pricingService, type HostingPlan } from '../lib/pricingService';
 import { useAuth } from '../contexts/AuthContext';
+import { useHostingPlansStore, type HostingPlan } from "../stores/PlansStore";
 
 type BillingCycle = 'monthly' | 'quarterly' | 'semiannually' | 'annually' | 'biennially' | 'triennially';
 
 interface Plan {
+  id: number;
   name: string;
   ram: number;
   vcpu: number;
@@ -23,6 +37,8 @@ interface Plan {
   };
   features: string[];
   popular?: boolean;
+  plan_type_label?: string; // friendly label
+  raw_plan_type?: string; // backend plan_type preserved
 }
 
 export function Pricing() {
@@ -30,19 +46,19 @@ export function Pricing() {
   const navigate = useNavigate();
   const { user } = useAuth();
   const typeParam = searchParams.get('type');
+
   const [billingCycle, setBillingCycle] = useState<BillingCycle>('monthly');
-  const [selectedType, setSelectedType] = useState(typeParam || 'general_purpose');
-  
-  // Dynamic pricing state
-  const [apiPlans, setApiPlans] = useState<HostingPlan[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [selectedType, setSelectedType] = useState<string>(typeParam || '');
 
-  const planTypes = [
-    { id: 'general_purpose', name: 'General Purpose VM', icon: Server, color: 'blue' },
-    { id: 'cpu_optimized', name: 'CPU Optimized VM', icon: Zap, color: 'orange' },
-    { id: 'memory_optimized', name: 'Memory Optimized VM', icon: Database, color: 'green' },
-  ];
+  // Zustand store
+  const { fetchAllPlans, plans, loading, error } = useHostingPlansStore();
 
+  // Fetch plans once (on mount)
+  useEffect(() => {
+    fetchAllPlans();
+  }, [fetchAllPlans]);
+
+  // ========== Billing cycles (UI) ==========
   const billingCycles = [
     { id: 'monthly' as BillingCycle, name: 'Monthly', discount: 5 },
     { id: 'quarterly' as BillingCycle, name: 'Quarterly', discount: 10 },
@@ -52,103 +68,122 @@ export function Pricing() {
     { id: 'triennially' as BillingCycle, name: 'Triennially', discount: 35 },
   ];
 
-  // Load plans from API
-  useEffect(() => {
-    const loadPlans = async () => {
-      try {
-        setLoading(true);
-        console.log('🔄 [Pricing Page] Fetching plans from API...');
-        const data = await pricingService.getPlans();
-        console.log('✅ [Pricing Page] Received data from database:', {
-          totalPlans: data.length,
-          planTypes: {
-            general_purpose: data.filter(p => p.plan_type === 'general_purpose').length,
-            cpu_optimized: data.filter(p => p.plan_type === 'cpu_optimized').length,
-            memory_optimized: data.filter(p => p.plan_type === 'memory_optimized').length,
-          },
-          samplePlan: data[0] ? {
-            name: data[0].name,
-            type: data[0].plan_type,
-            cpu: data[0].cpu_cores,
-            ram: data[0].ram_gb,
-            basePrice: data[0].base_price
-          } : null
-        });
-        console.log('📊 [Pricing Page] Full API Response:', data);
-        setApiPlans(data);
-        
-  // Success banner
-  console.log('%c✅ PRICING DATA LOADED FROM DATABASE', 'background: #10b981; color: white; padding: 8px 16px; font-weight: bold; font-size: 14px;');
-  console.log('%cAll plans are now fetched dynamically from PostgreSQL!', 'color: #10b981; font-weight: bold;');
-      } catch (error) {
-        console.error('❌ [Pricing Page] Error loading plans:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadPlans();
-  }, []);
+  // ========== Helpers ==========
+  const humanizePlanType = (raw: string) =>
+    raw
+      .replace(/[_\-]/g, ' ')
+      .replace(/\b([a-z])/g, (m) => m.toUpperCase());
 
-  // Transform API plans to UI format
-  const transformPlanToUI = (p: HostingPlan, planType: string): Plan & { id: number } => {
-    // Calculate semiannual price (6 months with 15% discount)
-    const basePrice = parseFloat(p.base_price);
-    const semiannualPrice = Math.round(basePrice * 6 * 0.85); // 15% discount
+  // Transform HostingPlan (backend) -> Plan (UI)
+  const transformPlanToUI = (p: HostingPlan): Plan => {
+    const basePrice = parseFloat(p.base_price || "0");
+    const semiannualPrice = Math.round(basePrice * 6 * 0.85); // 15% discount for 6 months
+
+    const planTypeLabel = humanizePlanType(p.plan_type || '');
 
     return {
-      id: p.id, // 🆕 Add plan ID
+      id: p.id,
       name: p.name,
       ram: p.ram_gb,
       vcpu: p.cpu_cores,
       storage: p.storage_gb,
       bandwidth: p.bandwidth_gb / 1000,
       prices: {
-        monthly: parseFloat(p.monthly_price),
-        quarterly: parseFloat(p.quarterly_price),
+        monthly: parseFloat(p.monthly_price || "0"),
+        quarterly: parseFloat(p.quarterly_price || "0"),
         semiannually: semiannualPrice,
-        annually: parseFloat(p.annual_price),
-        biennially: parseFloat(p.biennial_price),
-        triennially: parseFloat(p.triennial_price),
+        annually: parseFloat(p.annual_price || "0"),
+        biennially: parseFloat(p.biennial_price || "0"),
+        triennially: parseFloat(p.triennial_price || "0"),
       },
       features: [
         `${p.cpu_cores} vCPU`,
         `${p.ram_gb}GB RAM`,
         `${p.storage_gb}GB SSD Storage`,
         `${p.bandwidth_gb / 1000}TB Bandwidth`,
-        planType === 'cpu_optimized' ? 'Dedicated CPU' : planType === 'memory_optimized' ? 'High Memory Ratio' : 'IPv4 Address',
+        // Add an informative feature based on plan type
+        p.plan_type && p.plan_type.toLowerCase().includes('cpu')
+          ? 'Dedicated CPU'
+          : p.plan_type && p.plan_type.toLowerCase().includes('memory')
+          ? 'High Memory Ratio'
+          : 'IPv4 Address',
         'Console Access',
         'Full Root Access'
       ],
-      popular: p.name === 'G.8GB' || p.name === 'C.8GB' || p.name === 'M.16GB',
+      popular: ['G.8GB', 'C.8GB', 'M.16GB'].includes(p.name),
+      plan_type_label: planTypeLabel,
+      raw_plan_type: p.plan_type,
     };
   };
 
-  const plans: Record<string, Plan[]> = {
-    general_purpose: apiPlans.filter(p => p.plan_type === 'general_purpose').map(p => transformPlanToUI(p, 'general_purpose')),
-    cpu_optimized: apiPlans.filter(p => p.plan_type === 'cpu_optimized').map(p => transformPlanToUI(p, 'cpu_optimized')),
-    memory_optimized: apiPlans.filter(p => p.plan_type === 'memory_optimized').map(p => transformPlanToUI(p, 'memory_optimized')),
-  };
-
-  const currentPlans = plans[selectedType as keyof typeof plans];
-
-  // Log transformed plans for debugging
-  useEffect(() => {
-    if (apiPlans.length > 0) {
-      console.log(`� [Pricing Page] Currently showing: ${selectedType}`, {
-        planCount: currentPlans.length,
-        samplePlan: currentPlans[0] ? {
-          name: currentPlans[0].name,
-          vcpu: currentPlans[0].vcpu,
-          ram: currentPlans[0].ram,
-          monthlyPrice: currentPlans[0].prices.monthly
-        } : null,
-        allPlans: currentPlans.map(p => `${p.name} (${p.vcpu} vCPU, ${p.ram}GB RAM, ₹${p.prices.monthly}/mo)`)
-      });
+  // ========== Categories (auto from backend) ==========
+  // uniquePlanTypes: array of raw plan_type strings in order of appearance
+  const uniquePlanTypes = useMemo(() => {
+    const seen = new Set<string>();
+    const list: string[] = [];
+    for (const p of plans) {
+      const t = p.plan_type ?? 'unknown';
+      if (!seen.has(t)) {
+        seen.add(t);
+        list.push(t);
+      }
     }
-  }, [apiPlans.length, selectedType, currentPlans.length]);
-  const selectedPlanType = planTypes.find(type => type.id === selectedType);
+    return list;
+  }, [plans]);
 
+  // If no selectedType from query params, default to first backend category
+  useEffect(() => {
+    if (!selectedType) {
+      if (typeParam) {
+        setSelectedType(typeParam);
+      } else if (uniquePlanTypes.length > 0) {
+        setSelectedType(uniquePlanTypes[0]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uniquePlanTypes, typeParam]); // intentionally not listing selectedType so it doesn't override user selection
+
+  // Map backend plan types to friendly tab objects
+  const planTypeTabs = useMemo(() => {
+    return uniquePlanTypes.map((raw) => ({
+      id: raw,
+      label: humanizePlanType(raw),
+      // choose icon based on keywords (fallback to Server)
+      icon:
+        raw.toLowerCase().includes('cpu') || raw.toLowerCase().includes('dedicated')
+          ? Zap
+          : raw.toLowerCase().includes('memory')
+          ? Database
+          : raw.toLowerCase().includes('vps') || raw.toLowerCase().includes('cloud')
+          ? Server
+          : Server,
+    }));
+  }, [uniquePlanTypes]);
+
+  // Default fallback tabs if backend returns empty list
+  const fallbackPlanTypes = [
+    { id: 'general_purpose', label: 'General Purpose VM', icon: Server },
+    { id: 'cpu_optimized', label: 'CPU Optimized VM', icon: Zap },
+    { id: 'memory_optimized', label: 'Memory Optimized VM', icon: Database },
+  ];
+
+  const effectiveTabs = planTypeTabs.length > 0 ? planTypeTabs : fallbackPlanTypes;
+
+  // ========== Filter & transform plans for UI based on raw backend category ==========
+  const currentPlans: Plan[] = useMemo(() => {
+    if (!selectedType) return [];
+    return plans
+      .filter((p) => (p.plan_type ?? 'unknown') === selectedType)
+      .map(transformPlanToUI);
+  }, [plans, selectedType]);
+
+  // friendly selectedPlanType (for headings)
+  const selectedPlanTypeLabel = useMemo(() => {
+    const tab = effectiveTabs.find((t) => t.id === selectedType);
+    return tab?.label || humanizePlanType(selectedType || '');
+  }, [effectiveTabs, selectedType]);
+
+  // ========== Pricing helpers ==========
   const getDiscountPercent = () => {
     const cycle = billingCycles.find(c => c.id === billingCycle);
     return cycle?.discount || 0;
@@ -172,11 +207,11 @@ export function Pricing() {
     return Math.round(basePrice * (1 - discount / 100));
   };
 
-  const handleDeploy = (plan: Plan & { id: number }) => {
+  const handleDeploy = (plan: Plan) => {
     const serverConfig = {
-      planId: plan.id, // 🆕 Add plan ID
+      planId: plan.id,
       planName: plan.name,
-      planType: selectedType,
+      planType: plan.raw_plan_type || selectedType,
       vcpu: plan.vcpu,
       ram: plan.ram,
       storage: plan.storage,
@@ -188,17 +223,13 @@ export function Pricing() {
     };
 
     if (user) {
-      // User is logged in, go to checkout
       navigate('/checkout', { state: { serverConfig } });
     } else {
-      // User not logged in, go to login with return URL
-      navigate(`/login?redirect=${encodeURIComponent('/checkout')}`, { 
-        state: { serverConfig } 
-      });
+      navigate(`/login?redirect=${encodeURIComponent('/checkout')}`, { state: { serverConfig } });
     }
   };
 
-  // Show loading state while fetching data
+  // ========== Loading & Error UI ==========
   if (loading) {
     return (
       <div className="bg-slate-950 min-h-screen flex items-center justify-center">
@@ -210,6 +241,21 @@ export function Pricing() {
     );
   }
 
+  if (error) {
+    return (
+      <div className="bg-slate-950 min-h-screen flex items-center justify-center p-6">
+        <div className="text-center max-w-xl">
+          <h2 className="text-2xl font-bold text-white mb-2">Failed to load plans</h2>
+          <p className="text-slate-300 mb-6">{error}</p>
+          <button onClick={() => fetchAllPlans()} className="px-4 py-2 rounded bg-cyan-600 text-white font-semibold">
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ========== Render ==========
   return (
     <div className="bg-slate-950 min-h-screen">
       <MobileFilters
@@ -217,7 +263,7 @@ export function Pricing() {
         setBillingCycle={setBillingCycle}
         selectedType={selectedType}
         setSelectedType={setSelectedType}
-        planTypes={planTypes}
+        planTypes={effectiveTabs.map(t => ({ id: t.id, name: t.label, icon: t.icon }))}
         billingCycles={billingCycles}
       />
 
@@ -263,27 +309,30 @@ export function Pricing() {
                   <Server className="h-5 w-5 text-cyan-400 mr-2" />
                   Configure Your Plan
                 </h3>
-                
-                {/* Server Type Filter */}
+
+                {/* Dynamic Server Type Filter (tabs) */}
                 <div className="mb-6">
                   <label className="block text-sm font-semibold text-white mb-3">
                     Server Type
                   </label>
                   <div className="space-y-2">
-                    {planTypes.map((type) => (
-                      <button
-                        key={type.id}
-                        onClick={() => setSelectedType(type.id)}
-                        className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-all ${
-                          selectedType === type.id
-                            ? 'bg-cyan-600 text-white shadow-md'
-                            : 'bg-slate-800 text-slate-300 border border-cyan-500/30 hover:bg-slate-700'
-                        }`}
-                      >
-                        <type.icon className="h-5 w-5" />
-                        <span className="text-sm">{type.name}</span>
-                      </button>
-                    ))}
+                    {effectiveTabs.map((type) => {
+                      const Icon = type.icon;
+                      return (
+                        <button
+                          key={type.id}
+                          onClick={() => setSelectedType(type.id)}
+                          className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg font-medium transition-all ${
+                            selectedType === type.id
+                              ? 'bg-cyan-600 text-white shadow-md'
+                              : 'bg-slate-800 text-slate-300 border border-cyan-500/30 hover:bg-slate-700'
+                          }`}
+                        >
+                          <Icon className="h-5 w-5" />
+                          <span className="text-sm">{type.label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
 
@@ -330,14 +379,14 @@ export function Pricing() {
               <div className="bg-slate-900 rounded-2xl p-6 border-2 border-cyan-500">
                 <div className="mb-6">
                   <h2 className="text-2xl font-bold text-white mb-2">
-                    {selectedPlanType?.name} Plans
+                    {selectedPlanTypeLabel} Plans
                   </h2>
                   <p className="text-slate-400">
                     Showing {currentPlans.length} plans • Pricing per month
                   </p>
                 </div>
 
-                {/* Scrollable Plans Container - Amazon style showing 6 plans at once */}
+                {/* Scrollable Plans Container */}
                 <div className="h-[800px] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-cyan-500 scrollbar-track-slate-800">
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                     {currentPlans.map((plan, index) => (
@@ -424,18 +473,19 @@ export function Pricing() {
                     ))}
                   </div>
                 </div>
+
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Mobile: Original Full Page Layout */}
+      {/* Mobile: Full Page Layout */}
       <section className="md:hidden py-8 bg-slate-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-white mb-2">
-              {selectedPlanType?.name} Plans
+              {selectedPlanTypeLabel} Plans
             </h2>
             <p className="text-sm text-slate-400">
               Save up to {getDiscountPercent()}% on {billingCycle} billing
@@ -529,6 +579,7 @@ export function Pricing() {
         </div>
       </section>
 
+      {/* All Plans Include */}
       <section className="py-16 bg-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -558,6 +609,7 @@ export function Pricing() {
         </div>
       </section>
 
+      {/* Choose the Right Plan */}
       <section className="py-16 bg-slate-950">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
@@ -611,6 +663,7 @@ export function Pricing() {
         </div>
       </section>
 
+      {/* Contact / Custom */}
       <section className="py-16  text-white">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="text-3xl md:text-4xl font-bold mb-4">

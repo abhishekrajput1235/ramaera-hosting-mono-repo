@@ -1,8 +1,3 @@
-
-
-
-
-
 from sqlalchemy import Column, String, Integer, DateTime, Boolean, Numeric, ForeignKey, Text, JSON, Index
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
@@ -26,6 +21,7 @@ class HostingPlan(Base):
     base_price = Column(Numeric(10, 2), nullable=False)
     monthly_price = Column(Numeric(10, 2), nullable=False)
     quarterly_price = Column(Numeric(10, 2), nullable=False)
+    semiannual_price = Column(Numeric(10, 2), nullable=True)
     annual_price = Column(Numeric(10, 2), nullable=False)
     biennial_price = Column(Numeric(10, 2), nullable=False)
     triennial_price = Column(Numeric(10, 2), nullable=False)
