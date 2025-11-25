@@ -5,7 +5,6 @@ import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
 interface User {
   id: number;
-  username: string;
   email: string;
   full_name: string;
   role: string;
@@ -39,7 +38,6 @@ export function UserManagement() {
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
-      user.username?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
     
@@ -184,11 +182,10 @@ export function UserManagement() {
                   <td className="px-6 py-4 whitespace-nowrap ">
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-                        {user.full_name?.charAt(0) || user.username?.charAt(0) || 'U'}
+                        {user.full_name?.charAt(0) || 'U'}
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-semibold text-slate-900">{user.full_name || user.username}</div>
-                        <div className="text-sm text-slate-500">@{user.username}</div>
+                        <div className="text-sm font-semibold text-slate-900">{user.full_name}</div>
                       </div>
                     </div>
                   </td>
