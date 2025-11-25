@@ -31,6 +31,4 @@ migrations/
 *.swp
 
 # Docker
-docker-compose.yml
-Dockerfile
 .dockerignore
