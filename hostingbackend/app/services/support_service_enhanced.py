@@ -168,6 +168,23 @@ class SupportService:
             select(SupportTicket).where(SupportTicket.id == ticket_id)
         )
         return result.scalar_one_or_none()
+
+    async def get_ticket_by_number(self, db: AsyncSession, ticket_number: str) -> Optional[SupportTicket]:
+        """Get ticket by ticket number"""
+        result = await db.execute(
+            select(SupportTicket).where(SupportTicket.ticket_number == ticket_number)
+        )
+        return result.scalar_one_or_none()
+    
+    async def get_user_ticket_by_number(self, db: AsyncSession, user_id: int, ticket_number: str) -> Optional[SupportTicket]:
+        """Get user's specific ticket by number"""
+        result = await db.execute(
+            select(SupportTicket).where(
+                SupportTicket.ticket_number == ticket_number,
+                SupportTicket.user_id == user_id
+            )
+        )
+        return result.scalar_one_or_none()
     
     async def get_ticket_with_details(self, db: AsyncSession, ticket_id: int) -> Optional[Dict[str, Any]]:
         """Get ticket with user and assigned employee details"""

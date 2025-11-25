@@ -27,9 +27,9 @@ async def get_my_tickets(
     """Get current user's support tickets"""
     return await support_service.get_user_tickets(db, current_user.id, skip=skip, limit=limit, status=status)
 
-@router.get("/tickets/{ticket_id}")
+@router.get("/tickets/{ticket_number}")
 async def get_ticket_detail(
-    ticket_id: int,
+    ticket_number: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     support_service: SupportService = Depends()
@@ -37,19 +37,20 @@ async def get_ticket_detail(
     """Get ticket details with messages"""
     # Check if user owns this ticket or is admin/support
     if current_user.role in ["admin", "super_admin", "support"]:
-        ticket = await support_service.get_ticket_with_details(db, ticket_id)
+        ticket_obj = await support_service.get_ticket_by_number(db, ticket_number)
     else:
-        ticket_obj = await support_service.get_user_ticket(db, current_user.id, ticket_id)
-        if not ticket_obj:
-            raise HTTPException(status_code=404, detail="Ticket not found")
-        ticket = await support_service.get_ticket_with_details(db, ticket_id)
-    
-    if not ticket:
+        ticket_obj = await support_service.get_user_ticket_by_number(db, current_user.id, ticket_number)
+
+    if not ticket_obj:
         raise HTTPException(status_code=404, detail="Ticket not found")
+
+    ticket = await support_service.get_ticket_with_details(db, ticket_obj.id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket details not found")
     
     # Get messages
     include_internal = current_user.role in ["admin", "super_admin", "support"]
-    messages = await support_service.get_ticket_messages(db, ticket_id, include_internal=include_internal)
+    messages = await support_service.get_ticket_messages(db, ticket_obj.id, include_internal=include_internal)
     
     return {
         **ticket,
@@ -66,37 +67,32 @@ async def create_ticket(
     """Create new support ticket"""
     return await support_service.create_ticket(db, current_user.id, ticket_data)
 
-@router.post("/tickets/{ticket_id}/messages")
+@router.post("/tickets/{ticket_number}/messages")
 async def add_ticket_message(
-    ticket_id: int,
+    ticket_number: str,
     message_data: TicketMessageCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
     support_service: SupportService = Depends()
 ):
     """Add a message/reply to a ticket"""
-    print(f"=== ADD TICKET MESSAGE ===")
-    print(f"Ticket ID: {ticket_id}")
-    print(f"Current User: {current_user}")
-    print(f"Message Data: {message_data}")
-    
     # Verify user has access to this ticket
     if current_user.role in ["admin", "super_admin", "support"]:
-        ticket = await support_service.get_ticket_by_id(db, ticket_id)
+        ticket = await support_service.get_ticket_by_number(db, ticket_number)
         is_staff = True
     else:
-        ticket = await support_service.get_user_ticket(db, current_user.id, ticket_id)
+        ticket = await support_service.get_user_ticket_by_number(db, current_user.id, ticket_number)
         is_staff = False
     
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     
-    message = await support_service.add_message(db, ticket_id, current_user.id, message_data, is_staff=is_staff)
+    message = await support_service.add_message(db, ticket.id, current_user.id, message_data, is_staff=is_staff)
     return message
 
-@router.put("/tickets/{ticket_id}/status")
+@router.put("/tickets/{ticket_number}/status")
 async def update_ticket_status(
-    ticket_id: int,
+    ticket_number: str,
     new_status: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
@@ -104,19 +100,22 @@ async def update_ticket_status(
 ):
     """Update ticket status (user can only close their own tickets)"""
     if current_user.role in ["admin", "super_admin", "support"]:
-        ticket = await support_service.update_ticket_status(db, ticket_id, new_status)
+        ticket = await support_service.get_ticket_by_number(db, ticket_number)
     else:
         # Users can only close their own tickets
         if new_status != "closed":
             raise HTTPException(status_code=403, detail="You can only close your own tickets")
-        ticket = await support_service.get_user_ticket(db, current_user.id, ticket_id)
-        if not ticket:
-            raise HTTPException(status_code=404, detail="Ticket not found")
-        ticket = await support_service.update_ticket_status(db, ticket_id, new_status)
-    
+        ticket = await support_service.get_user_ticket_by_number(db, current_user.id, ticket_number)
+
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
-    return ticket
+        
+    updated_ticket = await support_service.update_ticket_status(db, ticket.id, new_status)
+    if not updated_ticket:
+        # This case should ideally not be reached if the first check passes
+        raise HTTPException(status_code=404, detail="Ticket could not be updated")
+        
+    return updated_ticket
 
 # ===========================
 # Admin/Support Staff Endpoints
