@@ -178,7 +178,7 @@ export function ReferralManagement() {
                   placeholder="Search affiliates..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-slate-800 rounded-lg"
+                  className="w-full pl-10 pr-4 py-2 border border-slate-800 rounded-lg bg-slate-950/60"
                 />
               </div>
 

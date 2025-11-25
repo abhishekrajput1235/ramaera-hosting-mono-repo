@@ -310,7 +310,7 @@ export function EmployeeManagement() {
                     placeholder="Search employees..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 border border-slate-800 rounded-lg"
+                    className="w-full pl-10 pr-4 py-2 border border-slate-800 rounded-lg bg-slate-950/60"
                   />
                 </div>
                 <button
@@ -337,7 +337,7 @@ export function EmployeeManagement() {
                     {filteredEmployees.map((employee) => (
                       <tr key={employee.id} className="hover:bg-slate-950/70">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-white">{employee.full_name}</div>
+                          <div className="text-sm font-medium text-white ">{employee.full_name}</div>
                           <div className="text-sm text-slate-500">{employee.email}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -460,8 +460,8 @@ export function EmployeeManagement() {
 
       {/* Add Employee Modal */}
       {showEmployeeModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-950/60 rounded-lg max-w-md w-full">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 ">
+          <div className=" rounded-lg max-w-md w-full border-2 bg-black">
             <div className="p-6">
               <h2 className="text-xl font-bold mb-4">Add New Employee</h2>
               <form onSubmit={handleCreateEmployee} className="space-y-4">
@@ -471,7 +471,7 @@ export function EmployeeManagement() {
                     type="text"
                     value={employeeForm.full_name}
                     onChange={(e) => setEmployeeForm({ ...employeeForm, full_name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border-2 border-slate-400 rounded-lg bg-slate-950/60"
                     required
                   />
                 </div>
@@ -481,7 +481,7 @@ export function EmployeeManagement() {
                     type="email"
                     value={employeeForm.email}
                     onChange={(e) => setEmployeeForm({ ...employeeForm, email: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border-2 border-slate-400 rounded-lg bg-slate-950/60"
                     required
                   />
                 </div>
@@ -491,7 +491,7 @@ export function EmployeeManagement() {
                     type="password"
                     value={employeeForm.password}
                     onChange={(e) => setEmployeeForm({ ...employeeForm, password: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border-2 border-slate-400 rounded-lg bg-slate-950/60"
                     required
                   />
                 </div>
@@ -500,7 +500,7 @@ export function EmployeeManagement() {
                   <select
                     value={employeeForm.role}
                     onChange={(e) => setEmployeeForm({ ...employeeForm, role: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border-2 border-slate-400 rounded-lg bg-slate-950/60"
                   >
                     <option value="support">Support Agent</option>
                     <option value="admin">Administrator</option>
@@ -512,7 +512,7 @@ export function EmployeeManagement() {
                   <select
                     value={employeeForm.department}
                     onChange={(e) => setEmployeeForm({ ...employeeForm, department: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border-2 border-slate-400 rounded-lg bg-slate-950/60"
                   >
                     {departments.map((dept) => (
                       <option key={dept.id} value={dept.code}>{dept.name}</option>

@@ -26,8 +26,8 @@ async def setup_admin():
     async with async_session() as session:
         try:
             # Email and password for admin
-            admin_email = "admin1234@test.com"
-            admin_password = "654321"  # This is what you're using
+            admin_email = "admin@gmail.com"
+            admin_password = "123456"  # This is what you're using
             
             print(f"\n🔐 Setting up admin account")
             print(f"  Email: {admin_email}")

@@ -251,7 +251,7 @@ export function SupportManagementEnhanced() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-sm"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-sm bg-slate-950/60"
                 >
                   <option value="all">All</option>
                   <option value="open">Open</option>
@@ -264,7 +264,7 @@ export function SupportManagementEnhanced() {
                 <select
                   value={priorityFilter}
                   onChange={(e) => setPriorityFilter(e.target.value)}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-sm"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-sm bg-slate-950/60"
                 >
                   <option value="all">All</option>
                   <option value="low">Low</option>
@@ -278,7 +278,7 @@ export function SupportManagementEnhanced() {
                 <select
                   value={assignedFilter || ''}
                   onChange={(e) => setAssignedFilter(e.target.value ? Number(e.target.value) : null)}
-                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-sm"
+                  className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-sm bg-slate-950/60"
                 >
                   <option value="">All agents</option>
                   {employees.map((emp) => (
@@ -297,7 +297,7 @@ export function SupportManagementEnhanced() {
                     placeholder="Keyword, ticket #, customer..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-sm"
+                    className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 text-sm bg-slate-950/60"
                   />
                 </div>
               </div>
@@ -327,10 +327,10 @@ export function SupportManagementEnhanced() {
                         isActive ? 'border-cyan-300 bg-cyan-50/50' : 'border-slate-200 bg-slate-950/60'
                       }`}
                     >
-                      <div className="flex items-center justify-between gap-3 mb-2">
+                      <div className="flex items-center justify-between gap-3 mb-2 ">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-mono text-slate-500">{ticket.ticket_number}</span>
-                          <span className={`inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(ticket.status)}`}>
+                          <span className={` inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(ticket.status)}`}>
                             {getStatusIcon(ticket.status)}
                             <span className="capitalize">{ticket.status.replace('_', ' ')}</span>
                           </span>
@@ -412,11 +412,11 @@ export function SupportManagementEnhanced() {
                   </select>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-slate-500 uppercase">Status</label>
+                  <label className="text-xs font-semibold text-slate-500 uppercase ">Status</label>
                   <select
                     value={selectedTicket.status}
                     onChange={(e) => handleUpdateStatus(selectedTicket.id, e.target.value)}
-                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-950/60"
                   >
                     <option value="open">Open</option>
                     <option value="in_progress">In Progress</option>

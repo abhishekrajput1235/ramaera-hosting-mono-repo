@@ -1887,8 +1887,12 @@ export function Checkout() {
                         </div>
                         <div>
                           <p className="text-xs uppercase text-slate-400">Status</p>
-                          <span className="inline-flex items-center px-3 py-1 rounded-full bg-amber-500/20 text-amber-200 text-sm font-semibold">
-                            Pending Payment
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
+                            (orderDetails?.payment?.status || orderDetails?.status) === 'paid' || (orderDetails?.payment?.status || orderDetails?.status) === 'authorized' 
+                              ? 'bg-green-500/20 text-green-200' 
+                              : 'bg-amber-500/20 text-amber-200'
+                          }`}>
+                            {orderDetails?.payment?.status || orderDetails?.status || 'Pending'}
                           </span>
                         </div>
                       </div>

@@ -91,7 +91,7 @@ import { Troubleshooting } from './pages/docs/Troubleshooting';
 function App() {
   return (
     <ErrorBoundary>
-      <SplashCursor/>
+      {/* <SplashCursor/> */}
       <BackendStatusBanner />
       <BrowserRouter>
         <AuthProvider>

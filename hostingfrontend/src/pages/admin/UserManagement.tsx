@@ -112,7 +112,7 @@ export function UserManagement() {
         {summaryCards.map((card) => (
           <div key={card.label} className="bg-slate-950/60 border border-slate-200 rounded-2xl p-5 shadow-sm">
             <p className="text-sm text-slate-500">{card.label}</p>
-            <p className="text-3xl font-semibold text-slate-900 mt-1">{card.value}</p>
+            <p className="text-3xl font-semibold text-white mt-1">{card.value}</p>
             <p className="text-sm text-slate-500 mt-2">{card.helper}</p>
           </div>
         ))}
@@ -129,7 +129,7 @@ export function UserManagement() {
                 placeholder="Search by name, username, or email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-950/60"
               />
             </div>
           </div>
@@ -139,7 +139,7 @@ export function UserManagement() {
             <select
               value={filterRole}
               onChange={(e) => setFilterRole(e.target.value)}
-              className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+              className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-950/60"
             >
               <option value="all">All Roles</option>
               <option value="customer">Customer</option>
@@ -150,11 +150,11 @@ export function UserManagement() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-600 mb-2">Account Status</label>
+            <label className="block text-sm font-medium text-slate-600 mb-2 ">Account Status</label>
             <select
               value={filterStatus}
               onChange={(e) => setFilterStatus(e.target.value)}
-              className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+              className="w-full px-4 py-2 border border-slate-200 rounded-xl focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-950/60"
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -168,7 +168,7 @@ export function UserManagement() {
       <div className="bg-slate-950/60 border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-slate-50 border-b border-slate-200">
+            <thead className="bg-slate-50 border-b border-slate-200 bg-slate-950/60">
               <tr>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">User</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Email</th>
@@ -178,10 +178,10 @@ export function UserManagement() {
                 <th className="px-6 py-4 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody className="divide-y divide-slate-100 bg-slate-950/60">
               {filteredUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50/70 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 whitespace-nowrap ">
                     <div className="flex items-center">
                       <div className="w-10 h-10 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
                         {user.full_name?.charAt(0) || user.username?.charAt(0) || 'U'}
@@ -226,10 +226,10 @@ export function UserManagement() {
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 text-sm text-slate-500 flex justify-between">
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 text-sm text-slate-500 flex justify-between bg-slate-950/60">
           <span>
-            Showing <span className="font-semibold text-slate-900">{filteredUsers.length}</span> of{' '}
-            <span className="font-semibold text-slate-900">{users.length}</span> users
+            Showing <span className="font-semibold text-white">{filteredUsers.length}</span> of{' '}
+            <span className="font-semibold text-white">{users.length}</span> users
           </span>
           <span className="text-slate-400">Filters applied: role {filterRole} / status {filterStatus}</span>
         </div>
