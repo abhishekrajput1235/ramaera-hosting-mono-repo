@@ -187,7 +187,7 @@ If you like this project, please leave a ⭐ star on GitHub!
 yaml
 Copy code
 
----
+----
 
 If you want, I can also generate:
 
@@ -218,4 +218,7 @@ Here is the markdown structure 👇
 ![Homepage](./hostingfrontend/src/assets//screenshots/homepage.png)
 
 ### 🖥️ Dashboard
-![Dashboard](./hostingfrontend/src/assets/screenshots/dashboard.png)
+![Dashboard](https://raw.githubusercontent.com/abhishekrajput1235/ramaera-hosting-mono-repo/main/hostingfrontend/src/assets/screenshots/dashboard.png)
+
+### ADMIN Dashboard
+![Dashboard](https://raw.githubusercontent.com/abhishekrajput1235/ramaera-hosting-mono-repo/main/hostingfrontend/src/assets/screenshots/admin-panel.png)
