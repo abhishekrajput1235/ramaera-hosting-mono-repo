@@ -215,7 +215,7 @@ Here is the markdown structure 👇
 ## 📸 Screenshots
 
 ### 🏠 Homepage
-![Homepage](./assets/screenshots/homepage.png)
+![Homepage](./hostingfrontend/src/assets//screenshots/homepage.png)
 
 ### 🖥️ Dashboard
-![Dashboard](./assets/screenshots/dashboard.png)
+![Dashboard](./hostingfrontend/src/assets/screenshots/dashboard.png)
