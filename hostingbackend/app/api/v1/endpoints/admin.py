@@ -204,6 +204,8 @@ async def get_all_users(
     }
 
 
+from sqlalchemy.orm import joinedload
+
 @router.get("/servers")
 async def get_all_servers(
     skip: int = 0,
@@ -212,32 +214,41 @@ async def get_all_servers(
     current_user: UserProfile = Depends(require_admin)
 ):
     """Get all servers with pagination"""
-    stmt = select(Server).offset(skip).limit(limit).order_by(Server.created_at.desc())
+    stmt = (
+        select(Server)
+        .options(joinedload(Server.user), joinedload(Server.plan))
+        .offset(skip)
+        .limit(limit)
+        .order_by(Server.created_at.desc())
+    )
     result = await db.execute(stmt)
-    servers = result.scalars().all()
+    servers = result.scalars().unique().all()
     
-    # Get total count
-    count_stmt = select(func.count(Server.id))
-    count_result = await db.execute(count_stmt)
-    total = count_result.scalar() or 0
-    
-    return {
-        "servers": [
-            {
-                "id": server.id,
-                "user_id": server.user_id,
-                "hostname": server.hostname,
-                "ip_address": server.ip_address,
-                "status": server.status,
-                "plan_id": server.plan_id,
-                "created_at": server.created_at.isoformat() if server.created_at else None,
-            }
-            for server in servers
-        ],
-        "total": total,
-        "skip": skip,
-        "limit": limit
-    }
+    return [
+        {
+            "id": server.id,
+            "user_id": server.user_id,
+            "server_name": server.server_name,
+            "hostname": server.hostname,
+            "ip_address": server.ip_address,
+            "server_status": server.server_status,
+            "server_type": server.server_type,
+            "plan_name": server.plan.name if server.plan else None,
+            "monthly_cost": server.monthly_cost,
+            "vcpu": server.vcpu,
+            "ram_gb": server.ram_gb,
+            "storage_gb": server.storage_gb,
+            "bandwidth_gb": server.bandwidth_gb,
+            "operating_system": server.operating_system,
+            "created_at": server.created_at.isoformat() if server.created_at else None,
+            "expiry_date": server.expiry_date.isoformat() if server.expiry_date else None,
+            "user": {
+                "email": server.user.email,
+                "full_name": server.user.full_name,
+            } if server.user else None,
+        }
+        for server in servers
+    ]
 
 
 @router.get("/orders")

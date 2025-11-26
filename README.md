@@ -197,3 +197,25 @@ If you want, I can also generate:
 ✅ Screenshots template  
 
 Just tell me!
+
+
+
+🌍 Live Demo
+
+🚀 Production App:
+👉 https://ramaerahosting.com/
+
+📸 Screenshots
+
+Add your actual screenshots inside:
+/assets/screenshots/ or /public/screenshots/
+
+Here is the markdown structure 👇
+
+## 📸 Screenshots
+
+### 🏠 Homepage
+![Homepage](./assets/screenshots/homepage.png)
+
+### 🖥️ Dashboard
+![Dashboard](./assets/screenshots/dashboard.png)
