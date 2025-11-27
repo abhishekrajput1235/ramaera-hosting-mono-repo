@@ -25,6 +25,8 @@ export function AdminDashboard() {
     monthlyRevenue: 0,
     newUsersThisMonth: 0,
   });
+  const [activityFeed, setActivityFeed] = useState<any[]>([]);
+  const [revenuePace, setRevenuePace] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -34,9 +36,16 @@ export function AdminDashboard() {
   const fetchDashboardData = async () => {
     try {
       setLoading(true);
-      const statsData = await api.getAdminStats();
-      
-      if (statsData) {
+      const results = await Promise.allSettled([
+        api.getAdminStats(),
+        api.getAdminActivityFeed(),
+        api.getAdminRevenuePace(),
+      ]);
+
+      const [statsResult, activityResult, revenuePaceResult] = results;
+
+      if (statsResult.status === 'fulfilled' && statsResult.value) {
+        const statsData = statsResult.value;
         setStats({
           totalUsers: statsData.total_users || 0,
           activeServers: statsData.active_servers || 0,
@@ -45,17 +54,25 @@ export function AdminDashboard() {
           monthlyRevenue: statsData.monthly_revenue || 0,
           newUsersThisMonth: statsData.new_users_this_month || 0,
         });
+      } else if (statsResult.status === 'rejected') {
+        console.error('Error fetching admin stats:', statsResult.reason);
       }
+
+      if (activityResult.status === 'fulfilled' && activityResult.value) {
+        setActivityFeed(activityResult.value);
+      } else if (activityResult.status === 'rejected') {
+        console.error('Error fetching activity feed:', activityResult.reason);
+      }
+
+      if (revenuePaceResult.status === 'fulfilled' && revenuePaceResult.value) {
+        setRevenuePace(revenuePaceResult.value.revenue_breakdown || []);
+      } else if (revenuePaceResult.status === 'rejected') {
+        console.error('Error fetching revenue pace:', revenuePaceResult.reason);
+      }
+
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
-      setStats({
-        totalUsers: 0,
-        activeServers: 0,
-        totalOrders: 0,
-        openTickets: 0,
-        monthlyRevenue: 0,
-        newUsersThisMonth: 0,
-      });
+      // Keep existing data or set to zero, but don't wipe everything if only one call fails
     } finally {
       setLoading(false);
     }
@@ -63,6 +80,31 @@ export function AdminDashboard() {
 
   const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(amount || 0);
+  
+  const timeSince = (date: string) => {
+    const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
+    let interval = seconds / 31536000;
+    if (interval > 1) {
+      return Math.floor(interval) + " years ago";
+    }
+    interval = seconds / 2592000;
+    if (interval > 1) {
+      return Math.floor(interval) + " months ago";
+    }
+    interval = seconds / 86400;
+    if (interval > 1) {
+      return Math.floor(interval) + " days ago";
+    }
+    interval = seconds / 3600;
+    if (interval > 1) {
+      return Math.floor(interval) + " hours ago";
+    }
+    interval = seconds / 60;
+    if (interval > 1) {
+      return Math.floor(interval) + " minutes ago";
+    }
+    return Math.floor(seconds) + " seconds ago";
+  };
 
   const quickStats = [
     {
@@ -97,13 +139,6 @@ export function AdminDashboard() {
       accent: 'text-rose-300 bg-rose-500/10',
       href: '/admin/support'
     },
-  ];
-
-  const activityFeed = [
-    { title: 'New enterprise order processed', meta: 'Order INV-1043 • ₹82,000', time: '14 min ago' },
-    { title: 'Server provisioning completed', meta: 'VPS-80GB for @velocitylabs', time: '31 min ago' },
-    { title: 'Ticket escalated to L2 support', meta: 'Billing dispute • Priority High', time: '1 hr ago' },
-    { title: 'Razorpay settlement received', meta: '₹2,45,300 • 12 payouts', time: '2 hrs ago' },
   ];
 
   const actionShortcuts = [
@@ -179,11 +214,7 @@ export function AdminDashboard() {
           </div>
 
           <div className="space-y-4">
-            {[
-              { label: 'Subscription renewals', value: '62%', helper: 'Auto-charge success rate' },
-              { label: 'One-time purchases', value: '28%', helper: 'Add-ons & upgrades' },
-              { label: 'Large contracts', value: '10%', helper: 'Quarterly / annual' },
-            ].map((row) => (
+            {revenuePace.map((row) => (
               <div key={row.label}>
                 <div className="flex justify-between text-sm text-slate-400">
                   <span>{row.label}</span>
@@ -238,13 +269,13 @@ export function AdminDashboard() {
             </button>
           </div>
           <div className="space-y-6">
-            {activityFeed.map((item) => (
-              <div key={item.title} className="flex items-start gap-4">
+            {activityFeed.map((item, index) => (
+              <div key={index} className="flex items-start gap-4">
                 <div className="w-2 h-2 rounded-full bg-cyan-400 mt-2"></div>
                 <div>
                   <p className="font-medium text-white">{item.title}</p>
                   <p className="text-sm text-slate-400">{item.meta}</p>
-                  <p className="text-xs text-slate-500 mt-1">{item.time}</p>
+                  <p className="text-xs text-slate-500 mt-1">{timeSince(item.time)}</p>
                 </div>
               </div>
             ))}

@@ -225,7 +225,7 @@ export function SupportManagementEnhanced() {
         actions={
           <button
             onClick={loadTickets}
-            className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 hover:bg-slate-50"
+            className="px-4 py-2 rounded-xl border border-slate-200 text-slate-300  hover:bg-green-500 hover:text-slate-900"
           >
             Refresh tickets
           </button>
@@ -235,8 +235,8 @@ export function SupportManagementEnhanced() {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {summaryCards.map((card) => (
           <div key={card.label} className="bg-slate-950/60 rounded-2xl border border-slate-200 shadow-sm p-5">
-            <p className="text-sm text-slate-500">{card.label}</p>
-            <p className="text-3xl font-semibold text-slate-900 mt-1">{card.value}</p>
+            <p className="text-sm text-white">{card.label}</p>
+            <p className="text-3xl font-semibold text-slate-100 mt-1">{card.value}</p>
             <p className={`text-sm mt-2 ${card.accent}`}>{card.helper}</p>
           </div>
         ))}

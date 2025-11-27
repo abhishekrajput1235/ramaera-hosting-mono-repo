@@ -439,6 +439,18 @@ class ApiClient {
     });
   }
 
+  async getAdminActivityFeed() {
+    return this.request('/api/v1/admin/activity-feed', {
+      method: 'GET',
+    });
+  }
+
+  async getAdminRevenuePace() {
+    return this.request('/api/v1/admin/revenue-pace', {
+      method: 'GET',
+    });
+  }
+
   // Dashboard endpoints
   async getDashboardStats(): Promise<DashboardStats> {
     return this.request<DashboardStats>('/api/v1/dashboard/stats', {

@@ -214,7 +214,8 @@ Here is the markdown structure 👇
 
 ## 📸 Screenshots
 
-![Homepage](https://raw.githubusercontent.com/abhishekrajput1235/ramaera-hosting-mono-repo/main/hostingfrontend/src/assets/screenshots/homepage.png)
+### 🏠 Homepage
+![Homepage](./hostingfrontend/src/assets//screenshots/homepage.png)
 
 ### 🖥️ Dashboard
-![Dashboard](/hostingfrontend/src/assets/screenshots/dashboard.png)
+![Dashboard](./hostingfrontend/src/assets/screenshots/dashboard.png)

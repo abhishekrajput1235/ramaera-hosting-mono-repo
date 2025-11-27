@@ -123,11 +123,6 @@ async def get_admin_stats(
     servers_result = await db.execute(servers_stmt)
     active_servers = servers_result.scalar() or 0
     
-    # Get total servers count
-    total_servers_stmt = select(func.count(Server.id))
-    total_servers_result = await db.execute(total_servers_stmt)
-    total_servers = total_servers_result.scalar() or 0
-    
     # Get total orders count
     orders_stmt = select(func.count(Order.id))
     orders_result = await db.execute(orders_stmt)
@@ -150,21 +145,107 @@ async def get_admin_stats(
     open_tickets_result = await db.execute(open_tickets_stmt)
     open_tickets = open_tickets_result.scalar() or 0
     
-    # Get referral program status
-    referrals_stmt = select(func.count(Referral.id)).where(Referral.status == 'active')
-    referrals_result = await db.execute(referrals_stmt)
-    active_referrals = referrals_result.scalar() or 0
-    
     return {
         "total_users": total_users,
-        "users_this_month": users_this_month,
+        "new_users_this_month": users_this_month,
         "active_servers": active_servers,
-        "total_servers": total_servers,
         "total_orders": total_orders,
         "monthly_revenue": monthly_revenue,
         "open_tickets": open_tickets,
-        "active_referrals": active_referrals,
-        "referral_status": "Active" if active_referrals > 0 else "Inactive"
+    }
+
+
+@router.get("/activity-feed")
+async def get_activity_feed(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserProfile = Depends(require_admin)
+):
+    """Get recent activity feed for admin dashboard"""
+    
+    # Get last 5 orders
+    orders_stmt = select(Order).order_by(Order.created_at.desc()).limit(5)
+    orders_result = await db.execute(orders_stmt)
+    recent_orders = orders_result.scalars().all()
+    
+    # Get last 5 tickets
+    tickets_stmt = select(SupportTicket).order_by(SupportTicket.created_at.desc()).limit(5)
+    tickets_result = await db.execute(tickets_stmt)
+    recent_tickets = tickets_result.scalars().all()
+    
+    activity_feed = []
+    for order in recent_orders:
+        activity_feed.append({
+            "type": "order",
+            "title": f"New order #{order.id}",
+            "meta": f"Total: ₹{order.total_amount}",
+            "time": order.created_at
+        })
+        
+    for ticket in recent_tickets:
+        activity_feed.append({
+            "type": "ticket",
+            "title": f"New ticket #{ticket.id}",
+            "meta": ticket.subject,
+            "time": ticket.created_at
+        })
+        
+    # Sort by time
+    activity_feed.sort(key=lambda x: x["time"], reverse=True)
+    
+    # Format time to be more readable
+    for item in activity_feed:
+        item["time"] = item["time"].isoformat()
+
+    return activity_feed[:5]
+
+
+@router.get("/revenue-pace")
+async def get_revenue_pace(
+    db: AsyncSession = Depends(get_db),
+    current_user: UserProfile = Depends(require_admin)
+):
+    """Get revenue pace for admin dashboard"""
+    
+    current_month_start = datetime.now().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+    
+    # Get monthly revenue (sum of completed orders this month)
+    monthly_revenue_stmt = select(func.sum(Order.total_amount)).where(
+        and_(
+            Order.created_at >= current_month_start,
+            Order.order_status == 'completed'
+        )
+    )
+    monthly_revenue_result = await db.execute(monthly_revenue_stmt)
+    monthly_revenue = float(monthly_revenue_result.scalar() or 0)
+
+    # For simplicity, I will return a breakdown of revenue by plan type.
+    # This is not what is hardcoded, but it is more realistic with the current data model.
+    revenue_by_plan_type_stmt = select(
+        HostingPlan.plan_type,
+        func.sum(Order.total_amount)
+    ).join(HostingPlan, Order.plan_id == HostingPlan.id).where(
+        and_(
+            Order.created_at >= current_month_start,
+            Order.order_status == 'completed'
+        )
+    ).group_by(HostingPlan.plan_type)
+
+    revenue_by_plan_type_result = await db.execute(revenue_by_plan_type_stmt)
+    revenue_by_plan_type = revenue_by_plan_type_result.all()
+
+    revenue_breakdown = []
+    if monthly_revenue > 0:
+        for plan_type, total in revenue_by_plan_type:
+            percentage = (total / monthly_revenue * 100)
+            revenue_breakdown.append({
+                "label": f"{plan_type.upper()} plans",
+                "value": f"{percentage:.0f}%",
+                "helper": f"₹{total:,.0f}"
+            })
+
+    return {
+        "monthly_revenue": monthly_revenue,
+        "revenue_breakdown": revenue_breakdown
     }
 
 
