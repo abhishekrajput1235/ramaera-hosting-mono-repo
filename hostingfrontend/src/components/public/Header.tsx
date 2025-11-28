@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Server, ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import logo from "../../assets/logo/hostinglogo1.png"
 
 export function Header() {
   const [productsOpen, setProductsOpen] = useState(false);
@@ -25,8 +26,8 @@ export function Header() {
       <nav className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link to="/" className="flex items-center space-x-2">
-            <Server className="h-8 w-8 text-cyan-400 animate-serverGlow" />
-            <span className="text-xl font-bold text-white">BIDUA Hosting</span>
+            {/* <Server className="h-8 w-8 text-cyan-400 animate-serverGlow" /> */}
+            <img src={logo} alt="BIDUA Hosting Logo"className="h-14 w-auto"  />
           </Link>
 
           <div className="hidden md:flex items-center space-x-8">
