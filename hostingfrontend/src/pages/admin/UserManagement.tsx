@@ -185,13 +185,13 @@ export function UserManagement() {
                         {user.full_name?.charAt(0) || 'U'}
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-semibold text-slate-900">{user.full_name}</div>
+                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{user.full_name}</div>
                       </div>
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center gap-2 text-slate-600">
-                      <Mail className="w-4 h-4 text-slate-400" />
+                    <div className="flex items-center gap-2 text-slate-600 dark:text-white">
+                      <Mail className="w-4 h-4 text-slate-400 " />
                       {user.email}
                     </div>
                   </td>
@@ -205,7 +205,7 @@ export function UserManagement() {
                       {user.account_status?.toUpperCase()}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-white">
                     {new Date(user.created_at).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">

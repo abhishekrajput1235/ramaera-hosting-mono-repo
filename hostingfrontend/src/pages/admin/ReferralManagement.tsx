@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, RefreshCw, DollarSign, TrendingUp, Eye } from 'lucide-react';
+import { Users, Search, RefreshCw, DollarSign } from 'lucide-react';
 import api from '../../lib/api';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
@@ -49,8 +49,18 @@ export function ReferralManagement() {
     try {
       setLoading(true);
       const [affiliatesRes, payoutsRes] = await Promise.all([
-        api.request('/api/v1/affiliate/admin/affiliates', { method: 'GET' }).catch(() => []),
-        api.request('/api/v1/affiliate/admin/payouts/pending', { method: 'GET' }).catch(() => []),
+        api.request('/api/v1/affiliate/admin/affiliates', { method: 'GET' })
+          .then(res => res)
+          .catch(err => {
+            console.error('Error fetching affiliates:', err);
+            return [];
+          }),
+        api.request('/api/v1/affiliate/admin/payouts/pending', { method: 'GET' })
+          .then(res => res)
+          .catch(err => {
+            console.error('Error fetching payouts:', err);
+            return [];
+          }),
       ]);
       setAffiliates(Array.isArray(affiliatesRes) ? affiliatesRes : []);
       setPayouts(Array.isArray(payoutsRes) ? payoutsRes : []);
@@ -199,8 +209,8 @@ export function ReferralManagement() {
                     {filteredAffiliates.map((affiliate) => (
                       <tr key={affiliate.id} className="hover:bg-slate-950/70">
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-white">{affiliate.user?.full_name || 'N/A'}</div>
-                          <div className="text-sm text-slate-500">{affiliate.user?.email || 'N/A'}</div>
+                          <div className="text-sm font-medium text-white">{affiliate.user?.full_name || 'User'}</div>
+                          <div className="text-sm text-slate-500">{affiliate.user?.email || 'example@gmail.com'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded font-mono text-sm">

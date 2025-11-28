@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Server, ChevronDown } from 'lucide-react';
+import { ChevronDown } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import logo from "../../assets/logo/hostinglogo1.png"
+import logo from "../../assets/logo/biduahostinglogo.png"
 
 export function Header() {
   const [productsOpen, setProductsOpen] = useState(false);
