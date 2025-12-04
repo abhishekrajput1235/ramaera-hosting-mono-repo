@@ -93,6 +93,15 @@ export function PlanCalculator() {
     loadPricingData();
   }, []);
   
+  useEffect(() => {
+    if (plans.length > 0) {
+      const availableRams = Object.keys(planConfigurations[planType]).map(Number);
+      if (!availableRams.includes(selectedRam)) {
+        setSelectedRam(availableRams[0]);
+      }
+    }
+  }, [plans, planType]);
+
   // Build plan configurations from API data
   const planConfigurations: Record<PlanType, Record<number, PlanConfig>> = {
     general_purpose: {},

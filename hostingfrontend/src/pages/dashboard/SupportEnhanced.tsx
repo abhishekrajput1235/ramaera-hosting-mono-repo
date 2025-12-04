@@ -15,6 +15,7 @@ import {
 import { api } from '../../lib/api';
 import { FileUpload } from '../../components/FileUpload';
 import { AttachmentList } from '../../components/AttachmentList';
+import { API_BASE_URL } from '../../lib/api';
 
 interface SupportTicketData {
   id: string;
@@ -116,7 +117,7 @@ export function SupportEnhanced() {
       // Load attachments to group with messages
       const token = localStorage.getItem('access_token');
       const attachmentsResponse = await fetch(
-        `http://localhost:8000/api/v1/attachments/tickets/${ticketId}/attachments?include_pending=true`,
+        `${API_BASE_URL}/api/v1/attachments/tickets/${ticketId}/attachments?include_pending=true`,
         {
           headers: { 'Authorization': `Bearer ${token}` }
         }
@@ -197,7 +198,7 @@ export function SupportEnhanced() {
       const token = localStorage.getItem('access_token');
       
       // Step 1: Send the message
-      const response = await fetch(`http://localhost:8000/api/v1/support/tickets/${selectedTicket.id}/messages`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/support/tickets/${selectedTicket.id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -220,7 +221,7 @@ export function SupportEnhanced() {
       // Step 2: Link pending attachments to this message
       if (pendingAttachments.length > 0) {
         try {
-          await fetch(`http://localhost:8000/api/v1/attachments/attachments/link-to-message`, {
+          await fetch(`${API_BASE_URL}/api/v1/attachments/attachments/link-to-message`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -257,7 +258,7 @@ export function SupportEnhanced() {
 
     try {
       const token = localStorage.getItem('access_token');
-      await fetch(`http://localhost:8000/api/v1/support/tickets/${ticketId}/status?new_status=closed`, {
+      await fetch(`${API_BASE_URL}/api/v1/support/tickets/${ticketId}/status?new_status=closed`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`

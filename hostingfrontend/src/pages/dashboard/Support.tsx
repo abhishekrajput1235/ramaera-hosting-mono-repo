@@ -94,7 +94,7 @@ export function Support() {
       console.log('Token preview:', token?.substring(0, 20) + '...');
       console.log('Ticket ID:', selectedTicket.ticket_number);
       console.log('Message:', newMessage);
-      console.log('API Base URL:', import.meta.env.VITE_API_URL || 'http://localhost:8000');
+      console.log('API Base URL:', import.meta.env.VITE_API_URL);
       
       const result = await api.addTicketMessage(selectedTicket.ticket_number, newMessage);
       console.log('Message sent successfully:', result);

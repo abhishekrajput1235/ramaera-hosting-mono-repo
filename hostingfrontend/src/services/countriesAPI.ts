@@ -1,3 +1,4 @@
+import { API_BASE_URL } from '../lib/api';
 // Countries API interface
 export interface Country {
   id: number;
@@ -19,7 +20,7 @@ export interface CountrySimple {
 }
 
 class CountriesAPI {
-  private static baseURL = 'http://localhost:8000/api/v1';
+  private static baseURL = `${API_BASE_URL}/api/v1`;
 
   static async getCountriesSimple(): Promise<CountrySimple[]> {
     try {

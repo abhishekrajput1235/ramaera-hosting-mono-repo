@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../lib/api';
+import { API_BASE_URL } from '../lib/api';
 
 export interface Addon {
   id: number;
@@ -41,7 +42,7 @@ export function useAddons(): UseAddonsReturn {
         setLoading(true);
         setError(null);
         
-        const response = await fetch('http://localhost:8000/api/v1/addons/');
+        const response = await fetch(`${API_BASE_URL}/api/v1/addons/`);
         
         if (!response.ok) {
           throw new Error(`Failed to fetch addons: ${response.statusText}`);

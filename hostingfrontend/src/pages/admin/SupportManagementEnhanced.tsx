@@ -9,6 +9,7 @@ import {
   Send
 } from 'lucide-react';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
+import { API_BASE_URL } from '../../lib/api';
 
 interface Ticket {
   id: number;
@@ -77,7 +78,7 @@ export function SupportManagementEnhanced() {
       if (priorityFilter !== 'all') params.append('priority', priorityFilter);
       if (assignedFilter) params.append('assigned_to', assignedFilter.toString());
 
-      const response = await fetch(`http://localhost:8000/api/v1/support/admin/tickets?${params}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/support/admin/tickets?${params}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
       const data = await response.json();
@@ -91,7 +92,7 @@ export function SupportManagementEnhanced() {
 
   const loadEmployees = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/v1/support/admin/employees', {
+      const response = await fetch(`${API_BASE_URL}/api/v1/support/admin/employees`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
       const data = await response.json();
@@ -104,7 +105,7 @@ export function SupportManagementEnhanced() {
   const loadTicketDetail = async (ticketId: number) => {
     try {
       setDetailsLoading(true);
-      const response = await fetch(`http://localhost:8000/api/v1/support/tickets/${ticketId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/v1/support/tickets/${ticketId}`, {
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
       const data = await response.json();
@@ -118,7 +119,7 @@ export function SupportManagementEnhanced() {
 
   const handleAssignTicket = async (ticketId: number, employeeId: number) => {
     try {
-      await fetch(`http://localhost:8000/api/v1/support/admin/tickets/${ticketId}/assign?employee_id=${employeeId}`, {
+      await fetch(`${API_BASE_URL}/api/v1/support/admin/tickets/${ticketId}/assign?employee_id=${employeeId}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
@@ -133,7 +134,7 @@ export function SupportManagementEnhanced() {
 
   const handleUpdateStatus = async (ticketId: number, newStatus: string) => {
     try {
-      await fetch(`http://localhost:8000/api/v1/support/tickets/${ticketId}/status?new_status=${newStatus}`, {
+      await fetch(`${API_BASE_URL}/api/v1/support/tickets/${ticketId}/status?new_status=${newStatus}`, {
         method: 'PUT',
         headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
       });
@@ -150,7 +151,7 @@ export function SupportManagementEnhanced() {
     if (!replyMessage.trim() || !selectedTicket) return;
 
     try {
-      await fetch(`http://localhost:8000/api/v1/support/tickets/${selectedTicket.id}/messages`, {
+      await fetch(`${API_BASE_URL}/api/v1/support/tickets/${selectedTicket.id}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

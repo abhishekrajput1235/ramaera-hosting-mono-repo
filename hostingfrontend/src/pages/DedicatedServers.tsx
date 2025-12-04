@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom';
 import { Server, Cpu, HardDrive, Network, Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { API_BASE_URL } from '../lib/api';
 
 interface ServerType {
   id: number;
@@ -36,7 +37,7 @@ export function DedicatedServers() {
   useEffect(() => {
     const fetchServers = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/v1/plans/all');
+        const response = await fetch(`${API_BASE_URL}/api/v1/plans/all`);
 
         if (!response.ok) {
           throw new Error('Failed to fetch servers');

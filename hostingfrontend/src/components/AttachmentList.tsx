@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Download, Trash2, File, AlertCircle, Loader2 } from 'lucide-react';
 import { api } from '../lib/api';
+import { API_BASE_URL } from '../lib/api';
 
 interface Attachment {
   id: number;
@@ -36,7 +37,7 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({ ticketId, onDele
       setLoading(true);
       const token = localStorage.getItem('access_token');
       const response = await fetch(
-        `http://localhost:8000/api/v1/attachments/tickets/${ticketId}/attachments`,
+        `${API_BASE_URL}/api/v1/attachments/tickets/${ticketId}/attachments`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -61,7 +62,7 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({ ticketId, onDele
       
       const token = localStorage.getItem('access_token');
       const response = await fetch(
-        `http://localhost:8000/api/v1/attachments/attachments/${attachment.id}/download`,
+        `${API_BASE_URL}/api/v1/attachments/attachments/${attachment.id}/download`,
         {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -113,7 +114,7 @@ export const AttachmentList: React.FC<AttachmentListProps> = ({ ticketId, onDele
       
       const token = localStorage.getItem('access_token');
       const response = await fetch(
-        `http://localhost:8000/api/v1/attachments/attachments/${attachment.id}`,
+        `${API_BASE_URL}/api/v1/attachments/attachments/${attachment.id}`,
         {
           method: 'DELETE',
           headers: {

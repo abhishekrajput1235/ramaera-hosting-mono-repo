@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import { API_BASE_URL } from '../lib/api';
 
 export function BackendStatusBanner() {
   const [isOnline, setIsOnline] = useState(true);
@@ -9,7 +10,7 @@ export function BackendStatusBanner() {
     try {
       setIsChecking(true);
       // Try to ping a lightweight endpoint
-      await fetch('http://localhost:8000/api/v1/health', { 
+      await fetch(`${API_BASE_URL}/api/v1/health`, { 
         method: 'GET',
         signal: AbortSignal.timeout(3000) // 3 second timeout
       });

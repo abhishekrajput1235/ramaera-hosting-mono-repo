@@ -1,6 +1,5 @@
-version: '3.8'
-
 services:
+
   backend:
     build: .
     ports:
@@ -8,20 +7,55 @@ services:
     env_file:
       - .env
     depends_on:
-      - db
+      - pgbouncer
     volumes:
       - .:/app
+    command: >
+      bash -c "
+      echo 'Waiting for PgBouncer...' &&
+      until nc -z pgbouncer 5432; do sleep 1; done &&
+      echo 'PgBouncer ready ✅' &&
+      alembic upgrade head &&
+      uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools
+      "
 
   db:
     image: postgres:13
+    command: postgres -c max_connections=300
     environment:
-      - POSTGRES_USER=${POSTGRES_USER}
-      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
-      - POSTGRES_DB=${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  pgbouncer:
+    image: edoburu/pgbouncer
+    depends_on:
+      - db
+    ports:
+      - "6432:5432"
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 2000
+      DEFAULT_POOL_SIZE: 50
+      RESERVE_POOL_SIZE: 20
+      SERVER_RESET_QUERY: DISCARD ALL
+
+  locust:
+    image: locustio/locust
+    ports:
+      - "8089:8089"
+    volumes:
+      - ./locustfile.py:/mnt/locust/locustfile.py
+    command: >
+      -f /mnt/locust/locustfile.py
+      --host http://localhost:8000
+    depends_on:
+      - backend
 
 volumes:
   postgres_data:

@@ -1,11 +1,11 @@
 // Prefer explicit 127.0.0.1 to avoid rare IPv6/mDNS localhost resolution issues
 // Allow override via VITE_API_URL; if localhost fails we'll retry with 127.0.0.1 once.
-const PRIMARY_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+const PRIMARY_BASE = import.meta.env.VITE_API_URL;
 const FALLBACK_BASE = PRIMARY_BASE.includes('localhost')
   ? PRIMARY_BASE.replace('localhost', '127.0.0.1')
   : PRIMARY_BASE;
 
-const API_BASE_URL = PRIMARY_BASE;
+export const API_BASE_URL = PRIMARY_BASE;
 
 class ApiClient {
   private baseUrl: string;

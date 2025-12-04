@@ -1,5 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react';
 import { Upload, X, File, AlertCircle, CheckCircle } from 'lucide-react';
+import { API_BASE_URL } from '../lib/api';
 
 interface UploadResponse {
   id: number;
@@ -138,7 +139,7 @@ export const FileUpload: React.FC<FileUploadProps> = ({
         );
       });
 
-      xhr.open('POST', `http://localhost:8000/api/v1/attachments/tickets/${ticketId}/attachments`);
+      xhr.open('POST', `${API_BASE_URL}/api/v1/attachments/tickets/${ticketId}/attachments`);
       xhr.setRequestHeader('Authorization', `Bearer ${token}`);
       xhr.send(formData);
     } catch (error) {

@@ -22,60 +22,6 @@ router = APIRouter()
 security = HTTPBearer()
 
 
-
-
-
-
-
-
-# @router.post("/register", response_model=Token)
-# async def register(
-#     user_data: UserCreate,
-#     db: AsyncSession = Depends(get_db),
-#     user_service: UserService = Depends()
-# ):
-#     """
-#     Register a new user
-#     """
-#     # Check if user already exists
-#     existing_user = await user_service.get_user_by_email(db, user_data.email)
-#     if existing_user:
-#         raise HTTPException(
-#             status_code=status.HTTP_400_BAD_REQUEST,
-#             detail="User with this email already exists"
-#         )
-    
-#     # Validate referral code if provided
-#     if user_data.referral_code:
-#         referral_user = await user_service.get_user_by_referral_code(db, user_data.referral_code)
-#         if not referral_user:
-#             raise HTTPException(
-#                 status_code=status.HTTP_400_BAD_REQUEST,
-#                 detail="Invalid referral code"
-#             )
-    
-#     try:
-#         # Create new user
-#         user = await user_service.create_user(db, user_data)
-        
-#         # Generate access token
-#         access_token = create_access_token(
-#             subject=str(user.id),
-#             expires_delta=timedelta(minutes=30)
-#         )
-        
-#         return {
-#             "access_token": access_token,
-#             "token_type": "bearer",
-#             "user": user
-#         }
-#     except Exception as e:
-#         raise HTTPException(
-#             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-#             detail=f"Error creating user: {str(e)}"
-#         )
-    
-
 @router.post("/register", response_model=Token)
 async def register(
     user_data: UserCreate,
