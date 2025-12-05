@@ -10,15 +10,21 @@ from app.schemas.users import User
 router = APIRouter()
 
 # ------------------------------------
-# PUBLIC: Get all servers
+# PRIVATE: Get user's servers (requires login)
 # ------------------------------------
 @router.get("/")
 async def get_servers(
     db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
     server_service: ServerService = Depends()
 ):
-    """Public: Get all servers"""
-    return await server_service.get_all_servers(db)
+    """Get servers - users see their own, admins see all"""
+    if current_user.role in ["admin", "super_admin"]:
+        # Admin: Return all servers
+        return await server_service.get_all_servers(db)
+    else:
+        # Regular user: Return only their servers
+        return await server_service.get_user_servers(db, current_user.id)
 
 
 # ------------------------------------
