@@ -166,6 +166,9 @@ class AffiliateStatsResponse(BaseModel):
     referral_code: Optional[str]
     is_active: bool
     can_request_payout: bool
+    
+    # Commission breakdown by level
+    commission_by_level: Optional[dict] = None  # {"L1": {"total": 1000, "count": 5}, ...}
 
     class Config:
         from_attributes = True

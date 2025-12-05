@@ -235,8 +235,14 @@ class AffiliateService:
 
         await db.commit()
         
-        # Update stats for all affected affiliates
+        # Update stats for all affected affiliates (L1, L2, L3)
         await self._update_referral_counts(db, referrer_subscription.user_id)
+        
+        # Also update stats for L2 and L3 referrers if they exist
+        if user and user.referral_level_2:
+            await self._update_referral_counts(db, user.referral_level_2)
+        if user and user.referral_level_3:
+            await self._update_referral_counts(db, user.referral_level_3)
         
         return referral_l1
 
@@ -470,6 +476,26 @@ class AffiliateService:
 
         # Get subscription info
         subscription = await self.get_user_subscription(db, user_id)
+        
+        # Calculate commission breakdown by level
+        from app.models.referrals import ReferralEarning
+        level_breakdown_result = await db.execute(
+            select(
+                ReferralEarning.level,
+                func.sum(ReferralEarning.commission_amount).label('total'),
+                func.count(ReferralEarning.id).label('count')
+            )
+            .where(ReferralEarning.user_id == user_id)
+            .group_by(ReferralEarning.level)
+        )
+        level_breakdown = level_breakdown_result.all()
+        
+        commission_by_level = {}
+        for lb in level_breakdown:
+            commission_by_level[f"L{lb.level}"] = {
+                "total": float(lb.total or 0),
+                "count": lb.count
+            }
 
         return AffiliateStatsResponse(
             total_referrals_level1=stats.total_referrals_level1,
@@ -491,7 +517,8 @@ class AffiliateService:
             subscription_status=subscription.status.value if subscription else None,
             referral_code=subscription.referral_code if subscription else None,
             is_active=subscription.is_active if subscription else False,
-            can_request_payout=stats.available_balance >= Decimal('500')
+            can_request_payout=stats.available_balance >= Decimal('500'),
+            commission_by_level=commission_by_level
         )
 
     async def get_team_members(
@@ -532,12 +559,13 @@ class AffiliateService:
             )
             total_purchases = purchases_result.scalar() or Decimal('0')
 
-            # Get total commission from this user
+            # Get total commission from this user (from ReferralEarning table)
+            from app.models.referrals import ReferralEarning
             commission_result = await db.execute(
-                select(func.coalesce(func.sum(Commission.commission_amount), 0)).where(
+                select(func.coalesce(func.sum(ReferralEarning.commission_amount), 0)).where(
                     and_(
-                        Commission.referral_id == ref.id,
-                        Commission.affiliate_user_id == user_id
+                        ReferralEarning.referred_user_id == ref.referred_user_id,
+                        ReferralEarning.user_id == user_id  # The user earning the commission
                     )
                 )
             )
@@ -712,7 +740,9 @@ class AffiliateService:
         await db.commit()
 
     async def _update_commission_stats(self, db: AsyncSession, user_id: int):
-        """Update commission stats"""
+        """Update commission stats from ReferralEarning table"""
+        from app.models.referrals import ReferralEarning
+        
         stats_result = await db.execute(
             select(AffiliateStats).where(AffiliateStats.affiliate_user_id == user_id)
         )
@@ -720,20 +750,20 @@ class AffiliateService:
         if not stats:
             return
 
-        # Total earned
+        # Total earned (all statuses)
         total_result = await db.execute(
-            select(func.coalesce(func.sum(Commission.commission_amount), 0)).where(
-                Commission.affiliate_user_id == user_id
+            select(func.coalesce(func.sum(ReferralEarning.commission_amount), 0)).where(
+                ReferralEarning.user_id == user_id
             )
         )
         stats.total_commission_earned = total_result.scalar() or Decimal('0')
 
         # Pending
         pending_result = await db.execute(
-            select(func.coalesce(func.sum(Commission.commission_amount), 0)).where(
+            select(func.coalesce(func.sum(ReferralEarning.commission_amount), 0)).where(
                 and_(
-                    Commission.affiliate_user_id == user_id,
-                    Commission.status == CommissionStatus.PENDING
+                    ReferralEarning.user_id == user_id,
+                    ReferralEarning.status == 'pending'
                 )
             )
         )
@@ -741,10 +771,10 @@ class AffiliateService:
 
         # Approved
         approved_result = await db.execute(
-            select(func.coalesce(func.sum(Commission.commission_amount), 0)).where(
+            select(func.coalesce(func.sum(ReferralEarning.commission_amount), 0)).where(
                 and_(
-                    Commission.affiliate_user_id == user_id,
-                    Commission.status == CommissionStatus.APPROVED
+                    ReferralEarning.user_id == user_id,
+                    ReferralEarning.status == 'approved'
                 )
             )
         )
@@ -752,10 +782,10 @@ class AffiliateService:
 
         # Paid
         paid_result = await db.execute(
-            select(func.coalesce(func.sum(Commission.commission_amount), 0)).where(
+            select(func.coalesce(func.sum(ReferralEarning.commission_amount), 0)).where(
                 and_(
-                    Commission.affiliate_user_id == user_id,
-                    Commission.status == CommissionStatus.PAID
+                    ReferralEarning.user_id == user_id,
+                    ReferralEarning.status == 'paid'
                 )
             )
         )
@@ -782,21 +812,11 @@ class AffiliateService:
         )
         stats.total_payout_amount = payout_amount_result.scalar() or Decimal('0')
 
-        # Available balance = approved - paid - pending payouts
-        pending_payouts_result = await db.execute(
-            select(func.coalesce(func.sum(Payout.amount), 0)).where(
-                and_(
-                    Payout.affiliate_user_id == user_id,
-                    Payout.status.in_([PayoutStatus.PENDING, PayoutStatus.PROCESSING])
-                )
-            )
-        )
-        pending_payouts = pending_payouts_result.scalar() or Decimal('0')
-
-        stats.available_balance = stats.approved_commission - stats.paid_commission - pending_payouts
-        stats.last_calculated_at = datetime.utcnow()
+        # Available balance = approved - withdrawn
+        stats.available_balance = stats.approved_commission - stats.total_payout_amount
 
         await db.commit()
+
 
     async def _get_commission_rule(
         self,

@@ -4,7 +4,7 @@ from app.api.v1.endpoints import (
     billing, dashboard, payments, 
     referrals, affiliate, admin, settings,
     invoices, addons, admin_pricing, attachments,
-    support_enhanced, countries, services
+    support_enhanced, countries, services, pricing
 )
 
 api_router = APIRouter()
@@ -18,6 +18,7 @@ api_router.include_router(plans.router, prefix="/plans", tags=["plans"])
 api_router.include_router(addons.router, prefix="/addons", tags=["addons"])
 api_router.include_router(services.router, prefix="/services", tags=["services"])
 api_router.include_router(admin_pricing.router, prefix="/admin/pricing", tags=["admin-pricing"])
+api_router.include_router(pricing.router, tags=["pricing"])  # Public pricing endpoints
 api_router.include_router(attachments.router, prefix="/attachments", tags=["attachments"])
 api_router.include_router(support_enhanced.router, prefix="/support", tags=["support"])
 api_router.include_router(countries.router, prefix="/countries", tags=["countries"])
