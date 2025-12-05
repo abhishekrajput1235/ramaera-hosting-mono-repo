@@ -303,7 +303,7 @@ class AffiliateService:
             else:
                 commission_amount = commission_rule.commission_value
 
-            # Create commission record
+            # Create commission record (Legacy)
             commission = Commission(
                 affiliate_user_id=referral.referrer_id,
                 referral_id=referral.id,
@@ -317,6 +317,32 @@ class AffiliateService:
                 status=CommissionStatus.PENDING
             )
             db.add(commission)
+
+            # Create ReferralEarning record (New System - used by Dashboard)
+            from app.models.referrals import ReferralEarning
+            
+            # Check if earning already exists to avoid duplicates
+            existing_earning = await db.execute(
+                select(ReferralEarning).where(
+                    and_(
+                        ReferralEarning.order_id == order_id,
+                        ReferralEarning.user_id == referral.referrer_id,
+                        ReferralEarning.level == referral.level
+                    )
+                )
+            )
+            if not existing_earning.scalar_one_or_none():
+                earning = ReferralEarning(
+                    user_id=referral.referrer_id,
+                    referred_user_id=user_id,
+                    order_id=order_id,
+                    level=referral.level,
+                    commission_rate=commission_rule.commission_value,
+                    order_amount=order_amount,
+                    commission_amount=commission_amount,
+                    status='pending'
+                )
+                db.add(earning)
 
         await db.commit()
 

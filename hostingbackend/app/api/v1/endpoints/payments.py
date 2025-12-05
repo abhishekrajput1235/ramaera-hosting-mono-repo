@@ -142,7 +142,7 @@ async def create_payment_order(
             'server_config': payment_request.server_config,
             'plan_name': plan.name,
             'has_premium_subscription': has_premium,
-            'enable_commission': has_premium,  # Commission केवल premium users के लिए
+            'enable_commission': True,  # Commission enabled for all server purchases (referrer check happens later)
             'skip_backend_calculation': skip_backend_calculation  # Flag to skip tax/discount recalc
         }
 

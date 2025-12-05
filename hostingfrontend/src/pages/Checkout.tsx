@@ -7,7 +7,7 @@ import { useCountryOptions, type CountryOption } from '../hooks/useCountryOption
 import { useAddons } from '../hooks/useAddons';
 import {
   Server, Check, CreditCard, FileText, ChevronRight, ChevronLeft,
-  Cpu, MemoryStick, HardDrive, Network, Clock, Shield, 
+  Cpu, MemoryStick, HardDrive, Network, Clock, Shield,
   User, Mail, Phone, MapPin, Building, Globe, Tag, Percent,
   Lock, Plus, Minus, FileDown, ChevronDown
 } from 'lucide-react';
@@ -72,9 +72,9 @@ const capitalizeWords = (value: string) =>
 
 const numberToWords = (num: number): string => {
   if (num === 0) return 'zero';
-  const belowTwenty = ['','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve','thirteen','fourteen','fifteen','sixteen','seventeen','eighteen','nineteen'];
-  const tens = ['','ten','twenty','thirty','forty','fifty','sixty','seventy','eighty','ninety'];
-  const thousands = ['','thousand','million','billion'];
+  const belowTwenty = ['', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];
+  const tens = ['', 'ten', 'twenty', 'thirty', 'forty', 'fifty', 'sixty', 'seventy', 'eighty', 'ninety'];
+  const thousands = ['', 'thousand', 'million', 'billion'];
 
   const helper = (n: number): string => {
     if (n === 0) return '';
@@ -223,14 +223,14 @@ export function Checkout() {
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const [showMobileSummary, setShowMobileSummary] = useState(false);
   const [expandedSection, setExpandedSection] = useState<string | null>('specs'); // For mobile accordion
-  
+
   // Countries state
   const { countries, loading: loadingCountries } = useCountryOptions();
   const currencyInfo = useMemo(() => getCurrencyInfo(billingInfo.country, countries), [billingInfo.country, countries]);
   const formatCurrency = (value: number) => currencyInfo.format(Number.isFinite(value) ? value : 0);
   const billingCountryLabel = useMemo(() => getCountryLabel(billingInfo.country, countries), [billingInfo.country, countries]);
   const isBillingCountryIndia = useMemo(() => isCountryIndia(billingInfo.country, countries), [billingInfo.country, countries]);
-  
+
   // Configuration options state
   const [operatingSystem, setOperatingSystem] = useState('almalinux-8.4');
   const [datacenter, setDatacenter] = useState('noida-india');
@@ -246,7 +246,7 @@ export function Checkout() {
   const [serverQuantity, setServerQuantity] = useState(1);
   // Backend-computed pricing quote (per selected cycle)
   const [pricingQuote, setPricingQuote] = useState<any | null>(null);
-  
+
   // New addon states
   const [pleskAddon, setPleskAddon] = useState(''); // '', 'admin', 'pro', 'host'
   const [backupStorage, setBackupStorage] = useState(''); // '', '100gb', '200gb', '300gb', '500gb', '1000gb'
@@ -254,7 +254,7 @@ export function Checkout() {
   const [supportPackage, setSupportPackage] = useState(''); // '', 'basic', 'premium'
   const [extraStorage, setExtraStorage] = useState(0); // GB - ₹2/GB/month
   const [extraBandwidth, setExtraBandwidth] = useState(0); // TB - ₹100/TB/month
-  
+
   // Simplified addon toggles (boolean checkbox/switch based)
   const [pleskLicense, setPleskLicense] = useState(false);
   const [automatedBackup, setAutomatedBackup] = useState(false);
@@ -289,7 +289,7 @@ export function Checkout() {
     // Check if coming from invoice payment
     const fromInvoice = location.state?.fromInvoice;
     const invoiceData = location.state?.invoice;
-    
+
     if (fromInvoice && invoiceData) {
       // Create server config from invoice
       const config: ServerConfig = {
@@ -400,33 +400,33 @@ export function Checkout() {
   // Calculate add-ons cost
   const calculateAddOnsCost = () => {
     let addOnsCost = 0;
-    
+
     // Extra Storage - Get price from backend
     if (extraStorage > 0) {
       const storageAddon = getAddonBySlug('extra-storage');
       const storagePrice = storageAddon?.price || 2; // Fallback to ₹2/GB
       addOnsCost += extraStorage * storagePrice;
     }
-    
+
     // Extra Bandwidth - Get price from backend
     if (extraBandwidth > 0) {
       const bandwidthAddon = getAddonBySlug('extra-bandwidth');
       const bandwidthPrice = bandwidthAddon?.price || 100; // Fallback to ₹100/TB
       addOnsCost += extraBandwidth * bandwidthPrice;
     }
-    
+
     // IPv4 addresses
     if (additionalIPv4 > 0) {
       const ipv4Addon = getAddonBySlug('additional-ipv4');
       const ipv4Price = ipv4Addon?.price || 200; // Fallback to ₹200/IP
       addOnsCost += additionalIPv4 * ipv4Price;
     }
-    
+
     // Old backup service (keeping for backwards compatibility)
     if (backupService) {
       addOnsCost += 500;
     }
-    
+
     // Managed server (self, basic, premium)
     if (managedService === 'basic') {
       const managedBasicAddon = getAddonBySlug('managed-basic');
@@ -436,7 +436,7 @@ export function Checkout() {
       addOnsCost += managedPremiumAddon?.price || 5000;
     }
     // managedService === 'self' adds nothing
-    
+
     // DDoS protection
     if (ddosProtection === 'advanced') {
       const ddosAdvancedAddon = getAddonBySlug('ddos-advanced');
@@ -445,7 +445,7 @@ export function Checkout() {
       const ddosEnterpriseAddon = getAddonBySlug('ddos-enterprise');
       addOnsCost += ddosEnterpriseAddon?.price || 3000;
     }
-    
+
     // Plesk addons
     if (pleskAddon === 'admin') {
       const pleskAdminAddon = getAddonBySlug('plesk-admin');
@@ -457,7 +457,7 @@ export function Checkout() {
       const pleskHostAddon = getAddonBySlug('plesk-host');
       addOnsCost += pleskHostAddon?.price || 2650; // Unlimited domains
     }
-    
+
     // Backup storage
     if (backupStorage === '100gb') {
       addOnsCost += 750;
@@ -470,7 +470,7 @@ export function Checkout() {
     } else if (backupStorage === '1000gb') {
       addOnsCost += 7500;
     }
-    
+
     // SSL certificates (annual, so divide by 12 for monthly)
     if (sslCertificate === 'essential') {
       addOnsCost += Math.round(2700 / 12); // ₹225/month
@@ -485,14 +485,14 @@ export function Checkout() {
     } else if (sslCertificate === 'rapid-wildcard') {
       addOnsCost += Math.round(16452.72 / 12); // ₹1371/month
     }
-    
+
     // Support packages
     if (supportPackage === 'basic') {
       addOnsCost += 2500;
     } else if (supportPackage === 'premium') {
       addOnsCost += 7500;
     }
-    
+
     return addOnsCost;
   };
 
@@ -500,22 +500,22 @@ export function Checkout() {
   const billingCycleInfo = useMemo(() => ({
     months:
       serverConfig?.billingCycle === 'quarterly' ? 3 :
-      serverConfig?.billingCycle === 'semiannually' ? 6 :
-      serverConfig?.billingCycle === 'annually' ? 12 :
-      serverConfig?.billingCycle === 'biennially' ? 24 :
-      serverConfig?.billingCycle === 'triennially' ? 36 : 1,
+        serverConfig?.billingCycle === 'semiannually' ? 6 :
+          serverConfig?.billingCycle === 'annually' ? 12 :
+            serverConfig?.billingCycle === 'biennially' ? 24 :
+              serverConfig?.billingCycle === 'triennially' ? 36 : 1,
     discount:
       serverConfig?.billingCycle === 'quarterly' ? 10 :
-      serverConfig?.billingCycle === 'semiannually' ? 15 :
-      serverConfig?.billingCycle === 'annually' ? 20 :
-      serverConfig?.billingCycle === 'biennially' ? 25 :
-      serverConfig?.billingCycle === 'triennially' ? 35 : 5,
+        serverConfig?.billingCycle === 'semiannually' ? 15 :
+          serverConfig?.billingCycle === 'annually' ? 20 :
+            serverConfig?.billingCycle === 'biennially' ? 25 :
+              serverConfig?.billingCycle === 'triennially' ? 35 : 5,
     label:
       serverConfig?.billingCycle === 'quarterly' ? 'Quarterly' :
-      serverConfig?.billingCycle === 'semiannually' ? 'Semiannually' :
-      serverConfig?.billingCycle === 'annually' ? 'Annually' :
-      serverConfig?.billingCycle === 'biennially' ? 'Biennially' :
-      serverConfig?.billingCycle === 'triennially' ? 'Triennially' : 'Monthly'
+        serverConfig?.billingCycle === 'semiannually' ? 'Semiannually' :
+          serverConfig?.billingCycle === 'annually' ? 'Annually' :
+            serverConfig?.billingCycle === 'biennially' ? 'Biennially' :
+              serverConfig?.billingCycle === 'triennially' ? 'Triennially' : 'Monthly'
   }), [serverConfig?.billingCycle]);
 
   // Subtotal for the selected billing cycle after cycle discount, before promo
@@ -526,10 +526,12 @@ export function Checkout() {
       return Number(pricingQuote.quote.subtotal_after_discount) || 0;
     }
     // Fallback local calculation
+    // NOTE: serverConfig.monthlyPrice is ALREADY the discounted per-month price from Pricing.tsx
+    // It was calculated using the computePricing() function which applies paise-based discount math
+    // So we just need to multiply by months and quantity, NOT apply discount again
     const perServerMonthly = serverConfig.monthlyPrice + calculateAddOnsCost();
-    const base = perServerMonthly * billingCycleInfo.months * serverQuantity;
-    const discount = Math.round(base * (billingCycleInfo.discount / 100));
-    return base - discount;
+    const totalForCycle = perServerMonthly * billingCycleInfo.months * serverQuantity;
+    return Math.round(totalForCycle);
   };
 
   const getTaxBreakdown = () => {
@@ -647,11 +649,11 @@ export function Checkout() {
         plan_id: serverConfig.planId,
         amount: pricingQuote?.quote?.total || calculateTotal(), // Prefer backend quote total
         billing_cycle: serverConfig.billingCycle === 'monthly' ? 'monthly' :
-                       serverConfig.billingCycle === 'quarterly' ? 'quarterly' :
-                       serverConfig.billingCycle === 'semiannually' ? 'semi_annual' :
-                       serverConfig.billingCycle === 'annually' ? 'annual' :
-                       serverConfig.billingCycle === 'biennially' ? 'biennial' :
-                       serverConfig.billingCycle === 'triennially' ? 'triennial' : 'monthly',
+          serverConfig.billingCycle === 'quarterly' ? 'quarterly' :
+            serverConfig.billingCycle === 'semiannually' ? 'semi_annual' :
+              serverConfig.billingCycle === 'annually' ? 'annual' :
+                serverConfig.billingCycle === 'biennially' ? 'biennial' :
+                  serverConfig.billingCycle === 'triennially' ? 'triennial' : 'monthly',
         server_config: {
           server_name: hostname || `${serverConfig.planName} Server`,
           hostname: hostname || `server-${Date.now()}.bidua.com`,
@@ -746,7 +748,7 @@ export function Checkout() {
 
                 // Move to confirmation step
                 setCurrentStep(3);
-                
+
                 // Scroll to top of page smoothly
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               } else {
@@ -856,8 +858,8 @@ export function Checkout() {
   const managedServiceLabel = managedService === 'premium'
     ? 'Managed by BIDUA (Premium)'
     : managedService === 'basic'
-    ? 'Managed by BIDUA (Basic)'
-    : 'I will manage the server myself';
+      ? 'Managed by BIDUA (Basic)'
+      : 'I will manage the server myself';
   const invoiceItemDescription = `${serverConfig.planName} - ${(hostname || serverConfig.planType || 'Server').trim()} (${servicePeriodRange})`;
   const billingLines = [
     billingInfo.fullName || 'Valued Customer',
@@ -892,32 +894,28 @@ export function Checkout() {
             {steps.map((step, index) => (
               <div key={step.number} className="flex items-center">
                 <div className={`flex flex-col items-center ${index > 0 ? 'ml-4 lg:ml-8' : ''}`}>
-                  <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full flex items-center justify-center border-2 transition-all touch-manipulation ${
-                    currentStep >= step.number
+                  <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full flex items-center justify-center border-2 transition-all touch-manipulation ${currentStep >= step.number
                       ? 'bg-cyan-600 border-cyan-600 text-white'
                       : 'bg-slate-800 border-slate-700 text-slate-500'
-                  }`}>
+                    }`}>
                     {currentStep > step.number ? (
                       <Check className="h-4 w-4 lg:h-6 lg:w-6" />
                     ) : (
                       <step.icon className="h-4 w-4 lg:h-6 lg:w-6" />
                     )}
                   </div>
-                  <span className={`mt-1 lg:mt-2 text-xs lg:text-sm font-medium hidden sm:block ${
-                    currentStep >= step.number ? 'text-cyan-400' : 'text-slate-500'
-                  }`}>
+                  <span className={`mt-1 lg:mt-2 text-xs lg:text-sm font-medium hidden sm:block ${currentStep >= step.number ? 'text-cyan-400' : 'text-slate-500'
+                    }`}>
                     {step.title}
                   </span>
-                  <span className={`mt-1 text-[10px] font-medium sm:hidden ${
-                    currentStep >= step.number ? 'text-cyan-400' : 'text-slate-500'
-                  }`}>
+                  <span className={`mt-1 text-[10px] font-medium sm:hidden ${currentStep >= step.number ? 'text-cyan-400' : 'text-slate-500'
+                    }`}>
                     Step {step.number}
                   </span>
                 </div>
                 {index < steps.length - 1 && (
-                  <div className={`w-12 lg:w-24 h-1 mx-2 lg:mx-4 ${
-                    currentStep > step.number ? 'bg-cyan-600' : 'bg-slate-700'
-                  }`} style={{ marginTop: index === 0 ? '-20px' : '-20px' }} />
+                  <div className={`w-12 lg:w-24 h-1 mx-2 lg:mx-4 ${currentStep > step.number ? 'bg-cyan-600' : 'bg-slate-700'
+                    }`} style={{ marginTop: index === 0 ? '-20px' : '-20px' }} />
                 )}
               </div>
             ))}
@@ -1040,37 +1038,37 @@ export function Checkout() {
                     </div>
                   </div>
 
-                {/* Datacenter Location - Collapsible on Mobile */}
-                <div className="bg-slate-950 rounded-xl border-2 border-cyan-500/30 overflow-hidden">
-                  <button
-                    onClick={() => setExpandedSection(expandedSection === 'datacenter' ? null : 'datacenter')}
-                    className="w-full flex items-center justify-between p-4 lg:p-6 hover:bg-slate-800/50 active:bg-slate-800 transition-all touch-manipulation min-h-[64px] lg:hidden"
-                  >
-                    <h3 className="text-lg font-bold text-white flex items-center space-x-2">
-                      <MapPin className="h-5 w-5 text-cyan-400" />
-                      <span>Datacenter Location</span>
-                    </h3>
-                    <ChevronDown className={`h-5 w-5 text-cyan-400 transition-transform duration-300 ${expandedSection === 'datacenter' ? 'rotate-180' : ''}`} />
-                  </button>
+                  {/* Datacenter Location - Collapsible on Mobile */}
+                  <div className="bg-slate-950 rounded-xl border-2 border-cyan-500/30 overflow-hidden">
+                    <button
+                      onClick={() => setExpandedSection(expandedSection === 'datacenter' ? null : 'datacenter')}
+                      className="w-full flex items-center justify-between p-4 lg:p-6 hover:bg-slate-800/50 active:bg-slate-800 transition-all touch-manipulation min-h-[64px] lg:hidden"
+                    >
+                      <h3 className="text-lg font-bold text-white flex items-center space-x-2">
+                        <MapPin className="h-5 w-5 text-cyan-400" />
+                        <span>Datacenter Location</span>
+                      </h3>
+                      <ChevronDown className={`h-5 w-5 text-cyan-400 transition-transform duration-300 ${expandedSection === 'datacenter' ? 'rotate-180' : ''}`} />
+                    </button>
 
-                  <div className={`lg:block ${expandedSection === 'datacenter' ? 'block' : 'hidden lg:block'}`}>
-                    <div className="p-4 lg:p-6">
-                      <label className="block font-bold text-white mb-3 lg:mb-4 hidden lg:flex items-center">
-                        <MapPin className="h-5 w-5 inline text-cyan-400 mr-2" />
-                        Datacenter Location
-                      </label>
-                      <select
-                        value={datacenter}
-                        onChange={(e) => setDatacenter(e.target.value)}
-                        className="w-full px-3 lg:px-4 py-3 bg-slate-900 border border-cyan-500/30 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-sm lg:text-base min-h-[44px]"
-                      >
-                        <option value="noida-india">🇮🇳 Noida, India</option>
-                        <option value="milton-keynes-uk">🇬🇧 Milton Keynes, United Kingdom</option>
-                        <option value="singapore" disabled>🇸🇬 Singapore (Coming Soon)</option>
-                      </select>
+                    <div className={`lg:block ${expandedSection === 'datacenter' ? 'block' : 'hidden lg:block'}`}>
+                      <div className="p-4 lg:p-6">
+                        <label className="block font-bold text-white mb-3 lg:mb-4 hidden lg:flex items-center">
+                          <MapPin className="h-5 w-5 inline text-cyan-400 mr-2" />
+                          Datacenter Location
+                        </label>
+                        <select
+                          value={datacenter}
+                          onChange={(e) => setDatacenter(e.target.value)}
+                          className="w-full px-3 lg:px-4 py-3 bg-slate-900 border border-cyan-500/30 rounded-lg text-white focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 text-sm lg:text-base min-h-[44px]"
+                        >
+                          <option value="noida-india">🇮🇳 Noida, India</option>
+                          <option value="milton-keynes-uk">🇬🇧 Milton Keynes, United Kingdom</option>
+                          <option value="singapore" disabled>🇸🇬 Singapore (Coming Soon)</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
-                </div>
 
                   {/* Server Configuration - Collapsible on Mobile */}
                   <div className="bg-slate-950 rounded-xl border-2 border-cyan-500/30 overflow-hidden">
@@ -1142,7 +1140,7 @@ export function Checkout() {
                           <Plus className="h-5 w-5 text-cyan-400 mr-2" />
                           Add-ons & Upgrades
                         </h4>
-                      
+
                         <div className="space-y-4">
                           {/* Additional IPv4 */}
                           <div className="p-3 lg:p-4 bg-slate-900 rounded-lg border border-slate-700">
@@ -1365,55 +1363,55 @@ export function Checkout() {
                     </div>
                   </div>
 
-                    {/* Billing Cycle */}
-                    <div className="bg-slate-950 rounded-xl p-6 border border-cyan-500/30">
-                      <h4 className="font-bold text-white mb-4 flex items-center">
-                        <Clock className="h-5 w-5 text-cyan-400 mr-2" />
-                        Billing Cycle
-                      </h4>
-                      <p className="text-lg text-white capitalize">{serverConfig.billingCycle}</p>
-                      <p className="text-sm text-green-400 mt-2">
-                        <Percent className="h-4 w-4 inline mr-1" />
-                        Saving {(() => {
-                          // Define discount percentages based on billing cycle
-                          const discountMap: Record<string, number> = {
-                            'monthly': 5,
-                            'quarterly': 10,
-                            'semiannually': 15,
-                            'annually': 20,
-                            'biennially': 25,
-                            'triennially': 35
-                          };
-                          const discountPercent = discountMap[serverConfig.billingCycle] || 0;
-                          return `${discountPercent}%`;
-                        })()} with {serverConfig.billingCycle} billing
-                      </p>
-                    </div>
+                  {/* Billing Cycle */}
+                  <div className="bg-slate-950 rounded-xl p-6 border border-cyan-500/30">
+                    <h4 className="font-bold text-white mb-4 flex items-center">
+                      <Clock className="h-5 w-5 text-cyan-400 mr-2" />
+                      Billing Cycle
+                    </h4>
+                    <p className="text-lg text-white capitalize">{serverConfig.billingCycle}</p>
+                    <p className="text-sm text-green-400 mt-2">
+                      <Percent className="h-4 w-4 inline mr-1" />
+                      Saving {(() => {
+                        // Define discount percentages based on billing cycle
+                        const discountMap: Record<string, number> = {
+                          'monthly': 5,
+                          'quarterly': 10,
+                          'semiannually': 15,
+                          'annually': 20,
+                          'biennially': 25,
+                          'triennially': 35
+                        };
+                        const discountPercent = discountMap[serverConfig.billingCycle] || 0;
+                        return `${discountPercent}%`;
+                      })()} with {serverConfig.billingCycle} billing
+                    </p>
+                  </div>
 
-                    {/* Included Features */}
-                    <div className="bg-slate-950 rounded-xl p-6 border border-cyan-500/30">
-                      <h4 className="font-bold text-white mb-4 flex items-center">
-                        <Shield className="h-5 w-5 text-cyan-400 mr-2" />
-                        Included Features
-                      </h4>
-                      <ul className="grid grid-cols-2 gap-3">
-                        {[
-                          'Full Root Access',
-                          'Console Access',
-                          'Basic DDoS Protection',
-                          '99.9% Uptime SLA',
-                          '24/7 Support',
-                          'IPv4 & IPv6',
-                          'NVMe SSD Storage',
-                          'Free Setup'
-                        ].map((feature, i) => (
-                          <li key={i} className="flex items-center text-sm text-slate-300">
-                            <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
-                            {feature}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
+                  {/* Included Features */}
+                  <div className="bg-slate-950 rounded-xl p-6 border border-cyan-500/30">
+                    <h4 className="font-bold text-white mb-4 flex items-center">
+                      <Shield className="h-5 w-5 text-cyan-400 mr-2" />
+                      Included Features
+                    </h4>
+                    <ul className="grid grid-cols-2 gap-3">
+                      {[
+                        'Full Root Access',
+                        'Console Access',
+                        'Basic DDoS Protection',
+                        '99.9% Uptime SLA',
+                        '24/7 Support',
+                        'IPv4 & IPv6',
+                        'NVMe SSD Storage',
+                        'Free Setup'
+                      ].map((feature, i) => (
+                        <li key={i} className="flex items-center text-sm text-slate-300">
+                          <Check className="h-4 w-4 text-green-500 mr-2 flex-shrink-0" />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
 
                   <button
                     onClick={handleNextStep}
@@ -1887,11 +1885,10 @@ export function Checkout() {
                         </div>
                         <div>
                           <p className="text-xs uppercase text-slate-400">Status</p>
-                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${
-                            (orderDetails?.payment?.status || orderDetails?.status) === 'paid' || (orderDetails?.payment?.status || orderDetails?.status) === 'authorized' 
-                              ? 'bg-green-500/20 text-green-200' 
+                          <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${(orderDetails?.payment?.status || orderDetails?.status) === 'paid' || (orderDetails?.payment?.status || orderDetails?.status) === 'authorized'
+                              ? 'bg-green-500/20 text-green-200'
                               : 'bg-amber-500/20 text-amber-200'
-                          }`}>
+                            }`}>
                             {orderDetails?.payment?.status || orderDetails?.status || 'Pending'}
                           </span>
                         </div>
@@ -2081,12 +2078,12 @@ export function Checkout() {
           <div className="hidden lg:block lg:col-span-1">
             <div className="bg-slate-900 rounded-2xl border-2 border-cyan-500/30 p-6 sticky top-4">
               <h3 className="text-xl font-bold text-white mb-6">Order Summary</h3>
-              
+
               {/* Server Details */}
               <div className="mb-6">
                 <h4 className="font-bold text-white mb-3">{serverConfig.planName}</h4>
                 <p className="text-sm text-cyan-400 mb-2">{serverConfig.planType}</p>
-                {currentStep >=2 && serverQuantity > 1 && (
+                {currentStep >= 2 && serverQuantity > 1 && (
                   <p className="text-sm text-green-400 mb-2">Quantity: {serverQuantity}x</p>
                 )}
               </div>
@@ -2097,7 +2094,7 @@ export function Checkout() {
                   <span className="text-slate-400">» Datacenter:</span>
                   <span className="text-white">{datacenter === 'noida-india' ? 'India' : 'United Kingdom'}</span>
                 </div>
-                
+
                 {operatingSystem && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» Operating System:</span>
@@ -2108,9 +2105,9 @@ export function Checkout() {
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">» Managed Server:</span>
                   <span className="text-white text-right">
-                    {managedService === 'self' ? 'I will manage the server myself' : 
-                     managedService === 'basic' ? 'Basic Management' : 
-                     managedService === 'premium' ? 'Premium Management' : 'Self-managed'}
+                    {managedService === 'self' ? 'I will manage the server myself' :
+                      managedService === 'basic' ? 'Basic Management' :
+                        managedService === 'premium' ? 'Premium Management' : 'Self-managed'}
                   </span>
                 </div>
               </div>
@@ -2165,18 +2162,18 @@ export function Checkout() {
                 {sslCertificate && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» SSL {
-                      sslCertificate === 'essential' ? 'Essential' : 
-                      sslCertificate === 'essential-wildcard' ? 'Essential Wildcard' :
-                      sslCertificate === 'comodo' ? 'Comodo' :
-                      sslCertificate === 'comodo-wildcard' ? 'Comodo Wildcard' :
-                      sslCertificate === 'rapid' ? 'RapidSSL' : 'RapidSSL Wildcard'
+                      sslCertificate === 'essential' ? 'Essential' :
+                        sslCertificate === 'essential-wildcard' ? 'Essential Wildcard' :
+                          sslCertificate === 'comodo' ? 'Comodo' :
+                            sslCertificate === 'comodo-wildcard' ? 'Comodo Wildcard' :
+                              sslCertificate === 'rapid' ? 'RapidSSL' : 'RapidSSL Wildcard'
                     }:</span>
                     <span className="text-white">{formatCurrency((
-                      sslCertificate === 'essential' ? 225 : 
-                      sslCertificate === 'essential-wildcard' ? 1162 : 
-                      sslCertificate === 'comodo' ? 208 : 
-                      sslCertificate === 'comodo-wildcard' ? 1084 : 
-                      sslCertificate === 'rapid' ? 250 : 1371
+                      sslCertificate === 'essential' ? 225 :
+                        sslCertificate === 'essential-wildcard' ? 1162 :
+                          sslCertificate === 'comodo' ? 208 :
+                            sslCertificate === 'comodo-wildcard' ? 1084 :
+                              sslCertificate === 'rapid' ? 250 : 1371
                     ) * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
@@ -2234,9 +2231,9 @@ export function Checkout() {
               <div className="border-t border-slate-700 pt-4 mb-4">
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-slate-400">Setup Fees:</span>
-                <span className="text-white">{formatCurrency(0)}</span>
+                  <span className="text-white">{formatCurrency(0)}</span>
                 </div>
-                
+
                 <div className="flex justify-between text-sm mb-2">
                   <span className="text-slate-400">{pricingQuote?.quote?.cycle_label || billingCycleInfo.label}:</span>
                   <span className="text-white font-semibold">{formatCurrency(calculateSubtotal())}</span>
@@ -2245,14 +2242,14 @@ export function Checkout() {
                 {promoDiscount > 0 && (
                   <div className="flex justify-between text-sm text-green-400 mb-2">
                     <span>Promo Discount:</span>
-                  <span>-{formatCurrency(promoDiscount)}</span>
+                    <span>-{formatCurrency(promoDiscount)}</span>
                   </div>
                 )}
 
                 {isBillingCountryIndia && (
                   <div className="flex justify-between text-sm text-slate-400 mb-2">
                     <span>IGST @ 18.00%:</span>
-                  <span className="text-white">{formatCurrency(calculateTax())}</span>
+                    <span className="text-white">{formatCurrency(calculateTax())}</span>
                   </div>
                 )}
               </div>
@@ -2262,7 +2259,7 @@ export function Checkout() {
                 <div className="flex justify-between items-baseline">
                   <span className="text-lg text-slate-300 font-bold">Total:</span>
                   <div className="text-right">
-                <div className="text-2xl font-bold text-cyan-400">{formatCurrency(calculateTotal())}</div>
+                    <div className="text-2xl font-bold text-cyan-400">{formatCurrency(calculateTotal())}</div>
                   </div>
                 </div>
               </div>
@@ -2326,7 +2323,7 @@ export function Checkout() {
                   <span className="text-slate-300">Datacenter:</span>
                   <span className="text-white">{datacenter === 'noida-india' ? 'India' : 'United Kingdom'}</span>
                 </div>
-                
+
                 {operatingSystem && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-300">OS:</span>
@@ -2337,9 +2334,9 @@ export function Checkout() {
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-300">Management:</span>
                   <span className="text-white text-right">
-                    {managedService === 'self' ? 'Self-managed' : 
-                     managedService === 'basic' ? 'Basic' : 
-                     'Premium'}
+                    {managedService === 'self' ? 'Self-managed' :
+                      managedService === 'basic' ? 'Basic' :
+                        'Premium'}
                   </span>
                 </div>
               </div>
@@ -2495,7 +2492,7 @@ export function Checkout() {
               {/* Pricing Breakdown */}
               <div className="space-y-2 mb-4">
                 <h5 className="text-xs font-semibold text-cyan-400 uppercase tracking-wide mb-2">Configuration & Add-ons</h5>
-                
+
                 <div className="flex justify-between text-sm">
                   <span className="text-slate-400">» Base Plan:</span>
                   <span className="text-white">{formatCurrency(serverConfig.monthlyPrice * (currentStep >= 2 ? serverQuantity : 1))}</span>
@@ -2539,18 +2536,18 @@ export function Checkout() {
                 {sslCertificate && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» SSL {
-                      sslCertificate === 'essential' ? 'Essential' : 
-                      sslCertificate === 'essential-wildcard' ? 'Essential Wildcard' :
-                      sslCertificate === 'comodo' ? 'Comodo' :
-                      sslCertificate === 'comodo-wildcard' ? 'Comodo Wildcard' :
-                      sslCertificate === 'rapid' ? 'RapidSSL' : 'RapidSSL Wildcard'
+                      sslCertificate === 'essential' ? 'Essential' :
+                        sslCertificate === 'essential-wildcard' ? 'Essential Wildcard' :
+                          sslCertificate === 'comodo' ? 'Comodo' :
+                            sslCertificate === 'comodo-wildcard' ? 'Comodo Wildcard' :
+                              sslCertificate === 'rapid' ? 'RapidSSL' : 'RapidSSL Wildcard'
                     }:</span>
                     <span className="text-white">{formatCurrency((
-                      sslCertificate === 'essential' ? 225 : 
-                      sslCertificate === 'essential-wildcard' ? 1162 : 
-                      sslCertificate === 'comodo' ? 208 : 
-                      sslCertificate === 'comodo-wildcard' ? 1084 : 
-                      sslCertificate === 'rapid' ? 250 : 1371
+                      sslCertificate === 'essential' ? 225 :
+                        sslCertificate === 'essential-wildcard' ? 1162 :
+                          sslCertificate === 'comodo' ? 208 :
+                            sslCertificate === 'comodo-wildcard' ? 1084 :
+                              sslCertificate === 'rapid' ? 250 : 1371
                     ) * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}

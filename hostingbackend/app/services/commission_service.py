@@ -36,6 +36,8 @@ class CommissionService:
         Returns:
             List of created ReferralEarning records
         """
+        print(f"🔍 [CommissionService] Starting commission distribution for payment_transaction_id={payment_transaction_id}")
+        
         # Get payment transaction
         result = await db.execute(
             select(PaymentTransaction).where(
@@ -45,21 +47,28 @@ class CommissionService:
         payment_transaction = result.scalars().first()
 
         if not payment_transaction:
+            print(f"❌ [CommissionService] Payment transaction not found: {payment_transaction_id}")
             raise HTTPException(
                 status_code=404,
                 detail="Payment transaction not found"
             )
 
+        print(f"✅ [CommissionService] Found payment transaction: user_id={payment_transaction.user_id}, type={payment_transaction.payment_type.value}, order_id={payment_transaction.order_id}")
+
         # Check if commission distribution is required
         if not payment_transaction.requires_commission():
+            print(f"⚠️  [CommissionService] Payment transaction does not require commission")
             return []
         
-        # ✅ Commission केवल server purchase के लिए जहां user ने ₹499 premium plan लिया हो
+        # ✅ Commission केवल server purchase के लिए जहां enable_commission=True
         enable_commission = payment_transaction.payment_metadata and \
                           payment_transaction.payment_metadata.get('enable_commission', False)
         
+        print(f"🔍 [CommissionService] enable_commission from metadata: {enable_commission}")
+        
         if not enable_commission:
             # Mark as distributed but don't create earnings
+            print(f"⚠️  [CommissionService] enable_commission is False, skipping commission distribution")
             payment_transaction.commission_distributed = True
             payment_transaction.commission_distributed_at = datetime.utcnow()
             await db.commit()
@@ -68,6 +77,7 @@ class CommissionService:
         # Check if already distributed (idempotency)
         if payment_transaction.commission_distributed:
             # Return existing earnings
+            print(f"ℹ️  [CommissionService] Commission already distributed for this transaction")
             result = await db.execute(
                 select(ReferralEarning).where(
                     ReferralEarning.order_id == payment_transaction.order_id
@@ -81,8 +91,15 @@ class CommissionService:
         )
         user = result.scalars().first()
 
-        if not user or not user.referred_by:
+        if not user:
+            print(f"❌ [CommissionService] User not found: {payment_transaction.user_id}")
+            return []
+            
+        print(f"🔍 [CommissionService] User found: email={user.email}, referred_by={user.referred_by}")
+
+        if not user.referred_by:
             # No referrer, mark as distributed anyway
+            print(f"⚠️  [CommissionService] User has no referrer (referred_by is NULL), skipping commission")
             payment_transaction.commission_distributed = True
             payment_transaction.commission_distributed_at = datetime.utcnow()
             await db.commit()
@@ -90,15 +107,18 @@ class CommissionService:
 
         # Get eligible amount for commission
         eligible_amount = Decimal(str(payment_transaction.get_commission_eligible_amount()))
+        print(f"💰 [CommissionService] Eligible amount for commission: ₹{eligible_amount}")
 
         # Get referral chain
         referral_chain = await self._get_referral_chain(db, user)
+        print(f"🔗 [CommissionService] Referral chain: {referral_chain}")
 
         # Get commission rates
         commission_rates = await self._get_commission_rates(
             db,
             payment_transaction.payment_type
         )
+        print(f"📊 [CommissionService] Commission rates: {commission_rates}")
 
         # Distribute to each level
         earnings = []
@@ -106,6 +126,7 @@ class CommissionService:
             if referrer_id and level <= 3:  # Max 3 levels
                 rate = commission_rates.get(level, Decimal('0.00'))
                 if rate > 0:
+                    print(f"💸 [CommissionService] Creating commission for Level {level}, referrer_id={referrer_id}, rate={rate}%")
                     earning = await self._create_earning(
                         db=db,
                         referrer_id=referrer_id,
@@ -117,12 +138,15 @@ class CommissionService:
                         payment_transaction=payment_transaction
                     )
                     earnings.append(earning)
+                    print(f"✅ [CommissionService] Created earning: id={earning.id}, amount=₹{earning.commission_amount}")
 
         # Mark commission as distributed
         payment_transaction.commission_distributed = True
         payment_transaction.commission_distributed_at = datetime.utcnow()
         
         await db.commit()
+        
+        print(f"✅ [CommissionService] Commission distribution complete. Created {len(earnings)} earnings.")
 
         return earnings
 

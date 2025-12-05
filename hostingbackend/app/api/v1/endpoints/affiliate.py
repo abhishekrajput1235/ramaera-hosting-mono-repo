@@ -157,20 +157,97 @@ async def get_affiliate_stats(
     return await affiliate_service.get_affiliate_stats(db, current_user.id)
 
 
-@router.get("/dashboard", response_model=AffiliateDashboard)
+@router.get("/dashboard")
 async def get_affiliate_dashboard(
     db: AsyncSession = Depends(get_db),
     current_user: UserProfile = Depends(get_current_user)
 ):
-    """Get complete affiliate dashboard data"""
+    """
+    Get complete affiliate dashboard data including:
+    - Subscription status
+    - Referral stats by level
+    - Commission earnings (from ReferralEarning table)
+    - Pending payouts
+    """
+    from app.models.affiliate import Payout, PayoutStatus
+    from app.models.referrals import ReferralEarning
+    from sqlalchemy import select, and_, func, desc
+    from decimal import Decimal
+    
     subscription = await affiliate_service.get_user_subscription(db, current_user.id)
     stats = await affiliate_service.get_affiliate_stats(db, current_user.id)
-    recent_commissions = await affiliate_service.get_recent_commissions(db, current_user.id, limit=10)
+    
+    # Get commission stats from ReferralEarning table
+    # Total commission by status
+    commission_stats_result = await db.execute(
+        select(
+            ReferralEarning.status,
+            func.sum(ReferralEarning.commission_amount).label('total'),
+            func.count(ReferralEarning.id).label('count')
+        )
+        .where(ReferralEarning.user_id == current_user.id)
+        .group_by(ReferralEarning.status)
+    )
+    commission_stats = commission_stats_result.all()
+    
+    # Parse commission stats
+    total_earned = Decimal('0.00')
+    pending_earned = Decimal('0.00')
+    approved_earned = Decimal('0.00')
+    paid_earned = Decimal('0.00')
+    
+    for stat in commission_stats:
+        amount = stat.total or Decimal('0.00')
+        total_earned += amount
+        if stat.status == 'pending':
+            pending_earned = amount
+        elif stat.status == 'approved':
+            approved_earned = amount
+        elif stat.status == 'paid':
+            paid_earned = amount
+    
+    # Get commission breakdown by level
+    level_stats_result = await db.execute(
+        select(
+            ReferralEarning.level,
+            func.sum(ReferralEarning.commission_amount).label('total'),
+            func.count(ReferralEarning.id).label('count')
+        )
+        .where(ReferralEarning.user_id == current_user.id)
+        .group_by(ReferralEarning.level)
+    )
+    level_stats = level_stats_result.all()
+    
+    commission_by_level = {}
+    for ls in level_stats:
+        commission_by_level[f"L{ls.level}"] = {
+            "count": ls.count,
+            "total": float(ls.total or 0)
+        }
+    
+    # Get recent commissions
+    recent_result = await db.execute(
+        select(ReferralEarning)
+        .where(ReferralEarning.user_id == current_user.id)
+        .order_by(desc(ReferralEarning.earned_at))
+        .limit(10)
+    )
+    recent_earnings = recent_result.scalars().all()
+    
+    recent_commissions = []
+    for e in recent_earnings:
+        recent_commissions.append({
+            "id": e.id,
+            "level": e.level,
+            "order_id": e.order_id,
+            "order_amount": float(e.order_amount),
+            "commission_rate": float(e.commission_rate),
+            "commission_amount": float(e.commission_amount),
+            "status": e.status,
+            "earned_at": e.earned_at.isoformat() if e.earned_at else None
+        })
     
     # Get pending payouts
-    from app.models.affiliate import Payout, PayoutStatus
-    from sqlalchemy import select, and_
-    
     payout_result = await db.execute(
         select(Payout).where(
             and_(
@@ -181,22 +258,40 @@ async def get_affiliate_dashboard(
     )
     pending_payouts = payout_result.scalars().all()
 
-    # Team summary
-    team_summary = {
-        "level1_count": stats.total_referrals_level1,
-        "level2_count": stats.total_referrals_level2,
-        "level3_count": stats.total_referrals_level3,
-        "total_active": stats.active_referrals,
-        "total_commission": stats.total_commission_earned
+    return {
+        "subscription": {
+            "id": subscription.id if subscription else None,
+            "status": subscription.status.value if subscription else None,
+            "referral_code": subscription.referral_code if subscription else None,
+            "is_active": subscription.is_active if subscription else False
+        } if subscription else None,
+        "referral_stats": {
+            "level1_count": stats.total_referrals_level1 if stats else 0,
+            "level2_count": stats.total_referrals_level2 if stats else 0,
+            "level3_count": stats.total_referrals_level3 if stats else 0,
+            "active_l1": stats.active_referrals_level1 if stats else 0,
+            "active_l2": stats.active_referrals_level2 if stats else 0,
+            "active_l3": stats.active_referrals_level3 if stats else 0,
+            "total_referrals": (stats.total_referrals_level1 + stats.total_referrals_level2 + stats.total_referrals_level3) if stats else 0
+        },
+        "commission_stats": {
+            "total_earned": float(total_earned),
+            "pending": float(pending_earned),  # Awaiting admin approval
+            "approved": float(approved_earned),  # Ready for payout
+            "paid": float(paid_earned),  # Already paid out
+            "available_for_payout": float(approved_earned),  # Can request payout
+            "by_level": commission_by_level
+        },
+        "recent_commissions": recent_commissions,
+        "pending_payouts": [
+            {
+                "id": p.id,
+                "amount": float(p.gross_amount),
+                "status": p.status,
+                "requested_at": p.requested_at.isoformat() if p.requested_at else None
+            } for p in pending_payouts
+        ]
     }
-
-    return AffiliateDashboard(
-        subscription=subscription,
-        stats=stats,
-        recent_commissions=recent_commissions,
-        pending_payouts=[PayoutResponse.from_orm(p) for p in pending_payouts],
-        team_summary=team_summary
-    )
 
 
 # ==================== Team Management ====================
@@ -237,15 +332,68 @@ async def get_team_hierarchy(
 
 # ==================== Commission Management ====================
 
-@router.get("/commissions", response_model=List[CommissionDetail])
+@router.get("/commissions")
 async def get_my_commissions(
     limit: int = Query(50, ge=1, le=200),
-    status_filter: Optional[str] = Query(None, description="Filter by status"),
+    status_filter: Optional[str] = Query(None, description="Filter by status: pending, approved, paid"),
     db: AsyncSession = Depends(get_db),
     current_user: UserProfile = Depends(get_current_user)
 ):
-    """Get user's commission history"""
-    return await affiliate_service.get_recent_commissions(db, current_user.id, limit)
+    """
+    Get user's commission history from ReferralEarning table.
+    These are commissions earned when referred users make purchases.
+    
+    Statuses:
+    - pending: Commission recorded, awaiting admin approval
+    - approved: Admin approved, available for payout
+    - paid: Commission has been paid out
+    """
+    from app.models.referrals import ReferralEarning
+    from sqlalchemy import select, desc, and_
+    
+    # Build query conditions
+    conditions = [ReferralEarning.user_id == current_user.id]
+    
+    if status_filter:
+        conditions.append(ReferralEarning.status == status_filter)
+    
+    # Query ReferralEarning table
+    result = await db.execute(
+        select(ReferralEarning)
+        .where(and_(*conditions))
+        .order_by(desc(ReferralEarning.earned_at))
+        .limit(limit)
+    )
+    earnings = result.scalars().all()
+    
+    # Format response with referred user details
+    commissions = []
+    for earning in earnings:
+        # Get referred user email
+        referred_email = None
+        if earning.referred_user_id:
+            from app.models.users import UserProfile as UP
+            user_result = await db.execute(
+                select(UP.email, UP.full_name).where(UP.id == earning.referred_user_id)
+            )
+            referred_user = user_result.first()
+            if referred_user:
+                referred_email = referred_user.email
+        
+        commissions.append({
+            "id": earning.id,
+            "level": earning.level,
+            "order_id": earning.order_id,
+            "order_amount": float(earning.order_amount),
+            "commission_rate": float(earning.commission_rate),
+            "commission_amount": float(earning.commission_amount),
+            "status": earning.status,
+            "referred_user_email": referred_email,
+            "earned_at": earning.earned_at.isoformat() if earning.earned_at else None,
+            "paid_at": earning.paid_at.isoformat() if earning.paid_at else None
+        })
+    
+    return commissions
 
 
 @router.get("/commissions/{commission_id}", response_model=CommissionDetail)
@@ -420,24 +568,180 @@ async def process_payout_admin(
     return PayoutResponse.from_orm(payout)
 
 
+@router.get("/admin/earnings/pending")
+async def get_pending_earnings(
+    skip: int = 0,
+    limit: int = 100,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_admin_user)
+):
+    """Get all pending commission earnings awaiting approval (Admin only)"""
+    from app.models.referrals import ReferralEarning
+    from sqlalchemy import select, desc
+    
+    result = await db.execute(
+        select(ReferralEarning)
+        .where(ReferralEarning.status == 'pending')
+        .order_by(desc(ReferralEarning.earned_at))
+        .offset(skip)
+        .limit(limit)
+    )
+    earnings = result.scalars().all()
+    
+    earnings_list = []
+    for e in earnings:
+        # Get user details
+        from app.models.users import UserProfile as UP
+        user_result = await db.execute(
+            select(UP.email, UP.full_name).where(UP.id == e.user_id)
+        )
+        user_data = user_result.first()
+        
+        referred_result = await db.execute(
+            select(UP.email, UP.full_name).where(UP.id == e.referred_user_id)
+        )
+        referred_data = referred_result.first()
+        
+        earnings_list.append({
+            "id": e.id,
+            "affiliate_user_id": e.user_id,
+            "affiliate_email": user_data.email if user_data else None,
+            "affiliate_name": user_data.full_name if user_data else None,
+            "referred_user_id": e.referred_user_id,
+            "referred_email": referred_data.email if referred_data else None,
+            "referred_name": referred_data.full_name if referred_data else None,
+            "order_id": e.order_id,
+            "level": e.level,
+            "order_amount": float(e.order_amount),
+            "commission_rate": float(e.commission_rate),
+            "commission_amount": float(e.commission_amount),
+            "status": e.status,
+            "earned_at": e.earned_at.isoformat() if e.earned_at else None
+        })
+    
+    return earnings_list
+
+
+@router.post("/admin/earnings/{earning_id}/approve")
+async def approve_earning_admin(
+    earning_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_admin_user)
+):
+    """
+    Approve a commission earning (Admin only).
+    Changes status from 'pending' to 'approved', making it available for payout.
+    """
+    from app.models.referrals import ReferralEarning
+    from sqlalchemy import select
+    from datetime import datetime
+    
+    result = await db.execute(
+        select(ReferralEarning).where(ReferralEarning.id == earning_id)
+    )
+    earning = result.scalar_one_or_none()
+    
+    if not earning:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Commission earning not found"
+        )
+    
+    if earning.status != 'pending':
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Commission is already {earning.status}, cannot approve"
+        )
+    
+    # Update status to approved
+    earning.status = 'approved'
+    await db.commit()
+    
+    return {
+        "message": "Commission approved successfully",
+        "earning_id": earning.id,
+        "amount": float(earning.commission_amount),
+        "status": earning.status
+    }
+
+
+@router.post("/admin/earnings/bulk-approve")
+async def bulk_approve_earnings(
+    earning_ids: List[int],
+    db: AsyncSession = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_admin_user)
+):
+    """Approve multiple commission earnings at once (Admin only)"""
+    from app.models.referrals import ReferralEarning
+    from sqlalchemy import select
+    
+    approved = []
+    failed = []
+    
+    for earning_id in earning_ids:
+        result = await db.execute(
+            select(ReferralEarning).where(ReferralEarning.id == earning_id)
+        )
+        earning = result.scalar_one_or_none()
+        
+        if earning and earning.status == 'pending':
+            earning.status = 'approved'
+            approved.append(earning_id)
+        else:
+            failed.append(earning_id)
+    
+    await db.commit()
+    
+    return {
+        "message": f"Approved {len(approved)} commissions",
+        "approved": approved,
+        "failed": failed
+    }
+
+
 @router.post("/admin/commissions/{commission_id}/approve")
 async def approve_commission_admin(
     commission_id: int,
     db: AsyncSession = Depends(get_db),
     current_user: UserProfile = Depends(get_current_admin_user)
 ):
-    """Approve a commission (Admin only)"""
-    commission = await affiliate_service.approve_commission(
-        db, commission_id, current_user.id
-    )
+    """
+    [DEPRECATED] Use /admin/earnings/{earning_id}/approve instead.
+    Approve a commission (Admin only)
+    """
+    # Redirect to the new ReferralEarning approval
+    from app.models.referrals import ReferralEarning
+    from sqlalchemy import select
     
-    if not commission:
+    result = await db.execute(
+        select(ReferralEarning).where(ReferralEarning.id == commission_id)
+    )
+    earning = result.scalar_one_or_none()
+    
+    if not earning:
+        # Try the old Commission model as fallback
+        commission = await affiliate_service.approve_commission(
+            db, commission_id, current_user.id
+        )
+        
+        if not commission:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Commission not found or already approved"
+            )
+        
+        return {"message": "Commission approved successfully", "commission_id": commission.id}
+    
+    if earning.status != 'pending':
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Commission not found or already approved"
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Commission is already {earning.status}"
         )
     
-    return {"message": "Commission approved successfully", "commission_id": commission.id}
+    earning.status = 'approved'
+    await db.commit()
+    
+    return {"message": "Commission approved successfully", "commission_id": earning.id}
 
 
 # ==================== Referral Tracking (Public) ====================
