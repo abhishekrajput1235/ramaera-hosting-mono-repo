@@ -324,16 +324,15 @@ export function SupportManagementEnhanced() {
                     <button
                       key={ticket.id}
                       onClick={() => loadTicketDetail(ticket.id)}
-                      className={`w-full text-left p-4 rounded-2xl border transition hover:border-cyan-200 ${
-                        isActive ? 'border-cyan-300 bg-cyan-50/50' : 'border-slate-200 bg-slate-950/60'
-                      }`}
+                      className={`w-full text-left p-4 rounded-2xl border transition hover:border-cyan-200 ${isActive ? 'border-cyan-300 bg-cyan-50/50' : 'border-slate-200 bg-slate-950/60'
+                        }`}
                     >
                       <div className="flex items-center justify-between gap-3 mb-2 ">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="text-xs font-mono text-slate-500">{ticket.ticket_number}</span>
                           <span className={` inline-flex items-center space-x-1 px-2 py-0.5 rounded-full text-xs font-semibold border ${getStatusColor(ticket.status)}`}>
                             {getStatusIcon(ticket.status)}
-                            <span className="capitalize">{ticket.status.replace('_', ' ')}</span>
+                            <span className="capitalize">{ticket.status ? ticket.status.replace('_', ' ') : 'Unknown'}</span>
                           </span>
                           <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border ${getPriorityColor(ticket.priority)}`}>
                             <span className="capitalize">{ticket.priority}</span>
@@ -388,7 +387,7 @@ export function SupportManagementEnhanced() {
                 <div className="text-right space-y-2">
                   <span className={`inline-flex items-center space-x-1 px-3 py-1 rounded-full text-xs font-semibold border ${getStatusColor(selectedTicket.status)}`}>
                     {getStatusIcon(selectedTicket.status)}
-                    <span className="capitalize">{selectedTicket.status.replace('_', ' ')}</span>
+                    <span className="capitalize">{selectedTicket.status ? selectedTicket.status.replace('_', ' ') : 'Unknown'}</span>
                   </span>
                   <span className={`block px-3 py-1 rounded-full text-xs font-semibold border ${getPriorityColor(selectedTicket.priority)}`}>
                     <span className="capitalize">{selectedTicket.priority} priority</span>
@@ -452,13 +451,12 @@ export function SupportManagementEnhanced() {
                     selectedTicket.messages.map((message) => (
                       <div
                         key={message.id}
-                        className={`p-4 rounded-2xl border text-sm ${
-                          message.is_internal_note
+                        className={`p-4 rounded-2xl border text-sm ${message.is_internal_note
                             ? 'bg-purple-50 border-purple-100'
                             : message.is_staff_reply
                               ? 'bg-cyan-50 border-cyan-100'
                               : 'bg-slate-50 border-slate-200'
-                        }`}
+                          }`}
                       >
                         <div className="flex items-center justify-between mb-2 text-xs text-slate-500">
                           <div className="flex items-center gap-2">

@@ -8,6 +8,7 @@ interface PlanData {
   name: string;
   slug: string;
   description: string;
+  plan_type: string;  // Added: vps, shared, dedicated, etc.
   vcpu: number;
   ram_gb: number;
   storage_gb: number;
@@ -28,6 +29,7 @@ export function PlansManagement() {
     name: '',
     slug: '',
     description: '',
+    plan_type: 'vps',  // Added: default to 'vps'
     vcpu: 1,
     ram_gb: 1,
     storage_gb: 20,
@@ -101,6 +103,7 @@ export function PlansManagement() {
       name: '',
       slug: '',
       description: '',
+      plan_type: 'vps',
       vcpu: 1,
       ram_gb: 1,
       storage_gb: 20,
@@ -117,6 +120,7 @@ export function PlansManagement() {
       name: plan.name,
       slug: plan.slug,
       description: plan.description || '',
+      plan_type: plan.plan_type || 'vps',
       vcpu: plan.vcpu,
       ram_gb: plan.ram_gb,
       storage_gb: plan.storage_gb,
@@ -212,9 +216,8 @@ export function PlansManagement() {
                   <h3 className="text-xl font-bold text-white">{plan.name}</h3>
                   <p className="text-sm text-slate-500">{plan.slug}</p>
                 </div>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${
-                  plan.is_active ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-slate-700'
-                }`}>
+                <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${plan.is_active ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-slate-700'
+                  }`}>
                   {plan.is_active ? 'Active' : 'Inactive'}
                 </span>
               </div>
@@ -301,6 +304,22 @@ export function PlansManagement() {
                       required
                     />
                   </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Plan Type</label>
+                  <select
+                    value={formData.plan_type}
+                    onChange={(e) => setFormData({ ...formData, plan_type: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
+                    required
+                  >
+                    <option value="vps">VPS - Virtual Private Server</option>
+                    <option value="shared">Shared Hosting</option>
+                    <option value="dedicated">Dedicated Server</option>
+                    <option value="cloud">Cloud Hosting</option>
+                    <option value="reseller">Reseller Hosting</option>
+                  </select>
                 </div>
 
                 <div>

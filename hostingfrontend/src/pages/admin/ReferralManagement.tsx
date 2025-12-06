@@ -50,18 +50,26 @@ export function ReferralManagement() {
       setLoading(true);
       const [affiliatesRes, payoutsRes] = await Promise.all([
         api.request('/api/v1/affiliate/admin/affiliates', { method: 'GET' })
-          .then(res => res)
+          .then(res => {
+            console.log('Affiliates API Response:', res);
+            return res;
+          })
           .catch(err => {
             console.error('Error fetching affiliates:', err);
             return [];
           }),
         api.request('/api/v1/affiliate/admin/payouts/pending', { method: 'GET' })
-          .then(res => res)
+          .then(res => {
+            console.log('Payouts API Response:', res);
+            return res;
+          })
           .catch(err => {
             console.error('Error fetching payouts:', err);
             return [];
           }),
       ]);
+      console.log('Setting affiliates:', affiliatesRes);
+      console.log('Setting payouts:', payoutsRes);
       setAffiliates(Array.isArray(affiliatesRes) ? affiliatesRes : []);
       setPayouts(Array.isArray(payoutsRes) ? payoutsRes : []);
     } catch (error) {
@@ -157,21 +165,19 @@ export function ReferralManagement() {
           <div className="flex">
             <button
               onClick={() => setActiveTab('affiliates')}
-              className={`px-6 py-3 font-medium ${
-                activeTab === 'affiliates'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
+              className={`px-6 py-3 font-medium ${activeTab === 'affiliates'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-slate-500 hover:text-slate-300'
+                }`}
             >
               Affiliates ({affiliates.length})
             </button>
             <button
               onClick={() => setActiveTab('payouts')}
-              className={`px-6 py-3 font-medium ${
-                activeTab === 'payouts'
-                  ? 'border-b-2 border-blue-600 text-blue-600'
-                  : 'text-slate-500 hover:text-slate-300'
-              }`}
+              className={`px-6 py-3 font-medium ${activeTab === 'payouts'
+                ? 'border-b-2 border-blue-600 text-blue-600'
+                : 'text-slate-500 hover:text-slate-300'
+                }`}
             >
               Pending Payouts ({payouts.length})
             </button>
@@ -231,9 +237,8 @@ export function ReferralManagement() {
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            affiliate.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${affiliate.is_active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
                             {affiliate.is_active ? 'Active' : 'Inactive'}
                           </span>
                         </td>

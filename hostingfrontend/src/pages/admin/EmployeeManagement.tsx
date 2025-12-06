@@ -75,15 +75,15 @@ export function EmployeeManagement() {
     try {
       setLoading(true);
 
-      // Fetch employees (users with role != 'customer')
-      const usersRes = await api.request('/api/v1/admin/users?limit=1000', { method: 'GET' });
-      const allUsers = Array.isArray(usersRes) ? usersRes : [];
-      const employeeUsers = allUsers.filter((u: Employee) =>
-        u.role !== 'customer' && (u.role === 'admin' || u.role === 'super_admin' || u.role === 'support')
-      );
+      // Fetch employees - /api/v1/admin/users returns {users: [...], total, skip, limit}
+      const usersRes = await api.request('/api/v1/admin/users?limit=1000', { method: 'GET' }) as any;
+      // Extract users array from response object
+      const allUsers = usersRes?.users ? usersRes.users : (Array.isArray(usersRes) ? usersRes : []);
+      // Filter to show all non-customer users (employees with any role except 'customer')
+      const employeeUsers = allUsers.filter((u: Employee) => u.role !== 'customer');
       setEmployees(employeeUsers);
 
-      // Fetch departments - use mock data if endpoint doesn't exist
+      // Fetch departments - returns flat array
       try {
         const deptRes = await api.request('/api/v1/admin/departments', { method: 'GET' });
         setDepartments(Array.isArray(deptRes) ? deptRes : []);
@@ -98,7 +98,7 @@ export function EmployeeManagement() {
         ]);
       }
 
-      // Fetch roles - use mock data if endpoint doesn't exist
+      // Fetch roles - returns flat array  
       try {
         const rolesRes = await api.request('/api/v1/admin/roles', { method: 'GET' });
         setRoles(Array.isArray(rolesRes) ? rolesRes : []);
@@ -137,7 +137,8 @@ export function EmployeeManagement() {
 
   const handleUpdateEmployeeRole = async (userId: number, newRole: string) => {
     try {
-      await api.request(`/api/v1/admin/users/${userId}/role`, {
+      // Use the correct endpoint: /api/v1/admin/employees/{employee_id}
+      await api.request(`/api/v1/admin/employees/${userId}`, {
         method: 'PUT',
         body: JSON.stringify({ role: newRole }),
       });
@@ -270,27 +271,24 @@ export function EmployeeManagement() {
           <div className="flex">
             <button
               onClick={() => setActiveTab('employees')}
-              className={`px-6 py-3 font-medium flex items-center gap-2 ${
-                activeTab === 'employees' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'
-              }`}
+              className={`px-6 py-3 font-medium flex items-center gap-2 ${activeTab === 'employees' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'
+                }`}
             >
               <Users className="w-4 h-4" />
               Employees
             </button>
             <button
               onClick={() => setActiveTab('departments')}
-              className={`px-6 py-3 font-medium flex items-center gap-2 ${
-                activeTab === 'departments' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'
-              }`}
+              className={`px-6 py-3 font-medium flex items-center gap-2 ${activeTab === 'departments' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'
+                }`}
             >
               <Building2 className="w-4 h-4" />
               Departments
             </button>
             <button
               onClick={() => setActiveTab('roles')}
-              className={`px-6 py-3 font-medium flex items-center gap-2 ${
-                activeTab === 'roles' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'
-              }`}
+              className={`px-6 py-3 font-medium flex items-center gap-2 ${activeTab === 'roles' ? 'border-b-2 border-blue-600 text-blue-600' : 'text-slate-500'
+                }`}
             >
               <Shield className="w-4 h-4" />
               Roles
@@ -346,9 +344,8 @@ export function EmployeeManagement() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            employee.account_status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                          }`}>
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${employee.account_status === 'active' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            }`}>
                             {employee.account_status}
                           </span>
                         </td>
@@ -360,11 +357,23 @@ export function EmployeeManagement() {
                             <select
                               value={employee.role}
                               onChange={(e) => handleUpdateEmployeeRole(employee.id, e.target.value)}
-                              className="text-sm border border-slate-800 rounded px-2 py-1"
+                              className="text-sm border border-slate-800 rounded px-2 py-1 bg-slate-950/60"
                             >
-                              <option value="support">Support</option>
-                              <option value="admin">Admin</option>
-                              <option value="super_admin">Super Admin</option>
+                              {/* Dynamically populate roles from backend */}
+                              {roles.length > 0 ? (
+                                roles.filter(r => r.is_active).map((role) => (
+                                  <option key={role.id} value={role.code} className="bg-slate-950/60">
+                                    {role.name}
+                                  </option>
+                                ))
+                              ) : (
+                                // Fallback options if no roles loaded
+                                <>
+                                  <option value="support">Support</option>
+                                  <option value="admin">Admin</option>
+                                  <option value="super_admin">Super Admin</option>
+                                </>
+                              )}
                             </select>
                             <button
                               onClick={() => handleDeleteEmployee(employee.id)}
@@ -407,9 +416,8 @@ export function EmployeeManagement() {
                   <div key={dept.id} className="bg-slate-950/70 p-4 rounded-lg border border-slate-900">
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-semibold text-white">{dept.name}</h3>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        dept.is_active ? 'bg-green-100 text-green-800' : 'bg-slate-900 text-slate-200'
-                      }`}>
+                      <span className={`px-2 py-1 text-xs rounded-full ${dept.is_active ? 'bg-green-100 text-green-800' : 'bg-slate-900 text-slate-200'
+                        }`}>
                         {dept.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
@@ -439,9 +447,8 @@ export function EmployeeManagement() {
                   <div key={role.id} className="bg-slate-950/70 p-4 rounded-lg border border-slate-900">
                     <div className="flex justify-between items-start mb-2">
                       <h3 className="font-semibold text-white">{role.name}</h3>
-                      <span className={`px-2 py-1 text-xs rounded-full ${
-                        role.is_active ? 'bg-green-100 text-green-800' : 'bg-slate-900 text-slate-200'
-                      }`}>
+                      <span className={`px-2 py-1 text-xs rounded-full ${role.is_active ? 'bg-green-100 text-green-800' : 'bg-slate-900 text-slate-200'
+                        }`}>
                         {role.is_active ? 'Active' : 'Inactive'}
                       </span>
                     </div>
@@ -542,18 +549,18 @@ export function EmployeeManagement() {
 
       {/* Add Department Modal */}
       {showDepartmentModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50  flex items-center justify-center z-50 p-4">
           <div className="bg-slate-950/60 rounded-lg max-w-md w-full">
-            <div className="p-6">
+            <div className="p-6 border-2 border-slate-500 rounded-lg">
               <h2 className="text-xl font-bold mb-4">Add New Department</h2>
-              <form onSubmit={handleCreateDepartment} className="space-y-4">
+              <form onSubmit={handleCreateDepartment} className="space-y-4 ">
                 <div>
                   <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
                   <input
                     type="text"
                     value={departmentForm.name}
                     onChange={(e) => setDepartmentForm({ ...departmentForm, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950/60"
                     required
                   />
                 </div>
@@ -563,7 +570,7 @@ export function EmployeeManagement() {
                     type="text"
                     value={departmentForm.code}
                     onChange={(e) => setDepartmentForm({ ...departmentForm, code: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950/60"
                     required
                   />
                 </div>
@@ -572,7 +579,7 @@ export function EmployeeManagement() {
                   <textarea
                     value={departmentForm.description}
                     onChange={(e) => setDepartmentForm({ ...departmentForm, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950/60"
                     rows={3}
                   />
                 </div>
@@ -601,7 +608,7 @@ export function EmployeeManagement() {
       {showRoleModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-slate-950/60 rounded-lg max-w-md w-full">
-            <div className="p-6">
+            <div className="p-6 border-2 border-slate-800 rounded-lg">
               <h2 className="text-xl font-bold mb-4">Add New Role</h2>
               <form onSubmit={handleCreateRole} className="space-y-4">
                 <div>
@@ -610,7 +617,7 @@ export function EmployeeManagement() {
                     type="text"
                     value={roleForm.name}
                     onChange={(e) => setRoleForm({ ...roleForm, name: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950/60"
                     required
                   />
                 </div>
@@ -620,7 +627,7 @@ export function EmployeeManagement() {
                     type="text"
                     value={roleForm.code}
                     onChange={(e) => setRoleForm({ ...roleForm, code: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950/60"
                     required
                   />
                 </div>
@@ -629,11 +636,11 @@ export function EmployeeManagement() {
                   <select
                     value={roleForm.department_id}
                     onChange={(e) => setRoleForm({ ...roleForm, department_id: parseInt(e.target.value) })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950/60"
                   >
                     <option value={0}>Select Department</option>
                     {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>{dept.name}</option>
+                      <option key={dept.id} value={dept.id} className="bg-slate-950/60" >{dept.name}</option>
                     ))}
                   </select>
                 </div>
@@ -642,7 +649,7 @@ export function EmployeeManagement() {
                   <textarea
                     value={roleForm.description}
                     onChange={(e) => setRoleForm({ ...roleForm, description: e.target.value })}
-                    className="w-full px-3 py-2 border border-slate-800 rounded-lg"
+                    className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950/60"
                     rows={3}
                   />
                 </div>

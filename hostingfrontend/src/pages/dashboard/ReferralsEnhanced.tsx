@@ -106,6 +106,16 @@ export function ReferralsEnhanced() {
   const [razorpayLoaded, setRazorpayLoaded] = useState(false);
   const [showWelcomeBanner, setShowWelcomeBanner] = useState(false);
   const [welcomeMessage, setWelcomeMessage] = useState('');
+  // Payout request modal state
+  const [showPayoutModal, setShowPayoutModal] = useState(false);
+  const [payoutForm, setPayoutForm] = useState({
+    amount: 0,
+    payment_method: 'bank_transfer',
+    account_number: '',
+    ifsc_code: '',
+    account_holder: '',
+    notes: ''
+  });
   // Use relaxed ID typing (string | number) due to backend returning string IDs
   type UIReferralEarning = Omit<AdapterReferralEarning, 'id'> & { id: string | number };
   type UIReferralPayout = Omit<AdapterReferralPayout, 'id'> & { id: string | number };
@@ -359,24 +369,76 @@ export function ReferralsEnhanced() {
     }
   };
 
+  const openPayoutModal = (isTotal: boolean = false, amount?: number) => {
+    if (isTotal && (!stats || stats.available_balance < 500)) {
+      alert('Minimum total payout amount is ₹500. Your current balance: ₹' + (stats?.available_balance || 0));
+      return;
+    }
+    if (isTotal && stats && stats.available_balance > 20000) {
+      alert('Maximum payout per day is ₹20,000. Please request ₹20,000 or contact support for higher amounts.');
+      return;
+    }
+    // Set form amount
+    const payoutAmount = isTotal ? Math.min(stats?.available_balance || 0, 20000) : (amount || stats?.available_balance || 0);
+    setPayoutForm(prev => ({
+      ...prev,
+      amount: payoutAmount,
+      account_holder: profile?.full_name || '',
+      notes: isTotal ? 'Total available balance payout request' : prev.notes
+    }));
+    setShowPayoutModal(true);
+  };
+
   const requestPayout = async () => {
-    if (!stats || stats.available_balance < 500) {
-      alert('Minimum payout amount is ₹500');
+    if (!payoutForm.amount || payoutForm.amount <= 0) {
+      alert('Please enter a valid payout amount');
+      return;
+    }
+    // Only check minimum for total balance requests (when notes contain 'Total available')
+    if (payoutForm.notes.includes('Total available') && payoutForm.amount < 500) {
+      alert('Minimum total payout amount is ₹500');
+      return;
+    }
+    if (payoutForm.amount > 20000) {
+      alert('Maximum payout per day is ₹20,000');
+      return;
+    }
+    if (!payoutForm.account_number || !payoutForm.ifsc_code || !payoutForm.account_holder) {
+      alert('Please fill in all bank account details');
       return;
     }
 
     try {
-      await api.post('/api/v1/affiliate/payouts/request', {
-        amount: stats.available_balance,
-        payment_method: 'bank_transfer',
-        payment_details: JSON.stringify({ account: 'Your bank details' }),
-        notes: 'Payout request'
+      const payment_details = JSON.stringify({
+        account_number: payoutForm.account_number,
+        ifsc_code: payoutForm.ifsc_code,
+        account_holder: payoutForm.account_holder
       });
-      alert('Payout request submitted successfully!');
+
+      await api.post('/api/v1/affiliate/payouts/request', {
+        amount: payoutForm.amount,
+        payment_method: payoutForm.payment_method,
+        payment_details,
+        notes: payoutForm.notes || 'Referral commission payout request'
+      });
+
+      setShowPayoutModal(false);
+      alert('✅ Payout request submitted successfully! Admin will review and process it.');
+
+      // Reset form
+      setPayoutForm({
+        amount: 0,
+        payment_method: 'bank_transfer',
+        account_number: '',
+        ifsc_code: '',
+        account_holder: '',
+        notes: ''
+      });
+
       loadData();
     } catch (error) {
       console.error('Payout request failed:', error);
-      alert('Failed to request payout. Please try again.');
+      alert('❌ Failed to request payout. Please try again.');
     }
   };
 
@@ -585,7 +647,7 @@ export function ReferralsEnhanced() {
             <div className="text-xs sm:text-sm text-slate-400 mb-2">Available Balance</div>
             {stats?.can_request_payout && (
               <button
-                onClick={requestPayout}
+                onClick={() => openPayoutModal(true)}
                 className="w-full px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition"
               >
                 Request Payout
@@ -847,6 +909,33 @@ export function ReferralsEnhanced() {
             {/* Earnings Tab */}
             {activeTab === 'earnings' && (
               <div className="space-y-4">
+                {/* Request Total Payout Button */}
+                {stats && (() => {
+                  const calculatedBalance = totalEarned - (stats.paid_commission || stats.total_payout_amount || 0);
+                  return (
+                    <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border-2 border-green-500 rounded-xl p-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="text-white font-bold text-lg mb-1">Request Total Payout</h3>
+                          <p className="text-green-300 text-sm">
+                            Available Balance: ₹{calculatedBalance.toLocaleString()}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-1">
+                            Total Earned: ₹{totalEarned.toLocaleString()} | Already Paid: ₹{(stats.paid_commission || stats.total_payout_amount || 0).toLocaleString()}
+                          </p>
+                          <p className="text-xs text-slate-400">Min: ₹500 | Max per day: ₹20,000</p>
+                        </div>
+                        <button
+                          onClick={() => openPayoutModal(true)}
+                          disabled={calculatedBalance < 500}
+                          className="px-6 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white font-semibold rounded-lg hover:from-green-500 hover:to-emerald-500 transition shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Request Total Payout
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })()}
                 {earnings.length === 0 && (
                   <div className="text-center py-12 text-slate-400">
                     <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
@@ -866,9 +955,33 @@ export function ReferralsEnhanced() {
                       </div>
                     </div>
                     <div className="flex items-center justify-between pt-2 border-t border-slate-700 text-xs">
-                      <span className="text-slate-400">Rate: {e.commission_percentage}%</span>
-                      {e.is_recurring && (
-                        <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full border border-cyan-500/30">Recurring</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400">Rate: {e.commission_percentage}%</span>
+                        {e.is_recurring && (
+                          <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full border border-cyan-500/30">Recurring</span>
+                        )}
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${(e as any).status === 'approved' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                          (e as any).status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
+                            (e as any).status === 'paid' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                              'bg-slate-500/20 text-slate-400 border border-slate-500/30'
+                          }`}>
+                          {(e as any).status || 'pending'}
+                        </span>
+                      </div>
+                      {((e as any).status === 'approved' || !(e as any).status) && (
+                        <button
+                          onClick={() => {
+                            setPayoutForm({
+                              ...payoutForm,
+                              amount: e.commission_amount,
+                              notes: `Payout request for Level ${e.level} commission (Order: ${formatCurrency(e.order_amount)})`
+                            });
+                            setShowPayoutModal(true);
+                          }}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition"
+                        >
+                          Request Payout
+                        </button>
                       )}
                     </div>
                   </div>
@@ -894,7 +1007,7 @@ export function ReferralsEnhanced() {
                         </div>
                       </div>
                       <button
-                        onClick={requestPayout}
+                        onClick={() => openPayoutModal(true)}
                         className="px-5 py-3 bg-white text-green-600 rounded-lg font-semibold hover:bg-green-50 transition"
                       >
                         Request Payout
@@ -960,6 +1073,145 @@ export function ReferralsEnhanced() {
           </div>
         </div>
       </div>
+
+      {/* Payout Request Modal */}
+      {showPayoutModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-2xl border-2 border-cyan-500 max-w-md w-full shadow-2xl">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-white">Request Payout</h2>
+                <button
+                  onClick={() => setShowPayoutModal(false)}
+                  className="text-slate-400 hover:text-white transition"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Amount */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Amount (₹)
+                  </label>
+                  <input
+                    type="number"
+                    value={payoutForm.amount}
+                    onChange={(e) => setPayoutForm({ ...payoutForm, amount: parseFloat(e.target.value) })}
+                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                    placeholder="Enter amount"
+                    min="500"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Minimum: ₹500 | Available: ₹{stats?.available_balance?.toLocaleString() || 0}</p>
+                </div>
+
+                {/* Payment Method */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Payment Method
+                  </label>
+                  <select
+                    value={payoutForm.payment_method}
+                    onChange={(e) => setPayoutForm({ ...payoutForm, payment_method: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
+                  >
+                    <option value="bank_transfer">Bank Transfer (NEFT/IMPS)</option>
+                    <option value="upi">UPI</option>
+                  </select>
+                </div>
+
+                {/* Account Holder Name */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Account Holder Name
+                  </label>
+                  <input
+                    type="text"
+                    value={payoutForm.account_holder}
+                    onChange={(e) => setPayoutForm({ ...payoutForm, account_holder: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
+                    placeholder="Full name as per bank"
+                  />
+                </div>
+
+                {/* Account Number */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Account Number / UPI ID
+                  </label>
+                  <input
+                    type="text"
+                    value={payoutForm.account_number}
+                    onChange={(e) => setPayoutForm({ ...payoutForm, account_number: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
+                    placeholder={payoutForm.payment_method === 'upi' ? 'yourname@upi' : 'Bank account number'}
+                  />
+                </div>
+
+                {/* IFSC Code (only for bank transfer) */}
+                {payoutForm.payment_method === 'bank_transfer' && (
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
+                      IFSC Code
+                    </label>
+                    <input
+                      type="text"
+                      value={payoutForm.ifsc_code}
+                      onChange={(e) => setPayoutForm({ ...payoutForm, ifsc_code: e.target.value.toUpperCase() })}
+                      className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
+                      placeholder="BANK0001234"
+                      maxLength={11}
+                    />
+                  </div>
+                )}
+
+                {/* Notes */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">
+                    Notes (Optional)
+                  </label>
+                  <textarea
+                    value={payoutForm.notes}
+                    onChange={(e) => setPayoutForm({ ...payoutForm, notes: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 resize-none"
+                    placeholder="Any additional information..."
+                    rows={2}
+                  />
+                </div>
+
+                {/* Tax Info */}
+                <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3">
+                  <p className="text-xs text-cyan-300 mb-2">💡 Tax Deductions (Informational):</p>
+                  <div className="grid grid-cols-3 gap-2 text-xs text-white">
+                    <div>TDS 10%: ₹{(payoutForm.amount * 0.10).toFixed(2)}</div>
+                    <div>GST 18%: ₹{(payoutForm.amount * 0.18).toFixed(2)}</div>
+                    <div className="font-bold">Net: ₹{(payoutForm.amount * 0.72).toFixed(2)}</div>
+                  </div>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowPayoutModal(false)}
+                    className="flex-1 px-4 py-3 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800 transition font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={requestPayout}
+                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 transition font-semibold shadow-lg"
+                  >
+                    Submit Request
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

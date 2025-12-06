@@ -506,10 +506,14 @@ async def get_all_affiliates(
     db: AsyncSession = Depends(get_db),
     current_user: UserProfile = Depends(get_current_admin_user)
 ):
-    """Get all affiliate subscriptions (Admin only)"""
-    from app.models.affiliate import AffiliateSubscription
-    from sqlalchemy import select
+    """Get all affiliate subscriptions with user details and stats (Admin only)"""
+    from app.models.affiliate import AffiliateSubscription, AffiliateStats
+    from app.models.users import UserProfile as UP
+    from app.models.referrals import ReferralEarning
+    from sqlalchemy import select, func, and_
+    from sqlalchemy.orm import selectinload
     
+    # Query affiliates with their stats
     result = await db.execute(
         select(AffiliateSubscription)
         .offset(skip)
@@ -517,7 +521,57 @@ async def get_all_affiliates(
     )
     affiliates = result.scalars().all()
     
-    return [AffiliateSubscriptionResponse.from_orm(a) for a in affiliates]
+    # Build response with user details and stats
+    response_data = []
+    for aff in affiliates:
+        # Get user details
+        user_result = await db.execute(
+            select(UP).where(UP.id == aff.user_id)
+        )
+        user = user_result.scalar_one_or_none()
+        
+        # Get affiliate stats
+        stats_result = await db.execute(
+            select(AffiliateStats).where(AffiliateStats.affiliate_user_id == aff.user_id)
+        )
+        stats = stats_result.scalar_one_or_none()
+        
+        # Calculate TOTAL commission from ReferralEarning (sum of L1, L2, L3)
+        total_commission_result = await db.execute(
+            select(func.coalesce(func.sum(ReferralEarning.commission_amount), 0))
+            .where(ReferralEarning.user_id == aff.user_id)
+        )
+        total_commission = total_commission_result.scalar() or 0
+        
+        # Calculate approved commission (available for payout)
+        approved_commission_result = await db.execute(
+            select(func.coalesce(func.sum(ReferralEarning.commission_amount), 0))
+            .where(
+                and_(
+                    ReferralEarning.user_id == aff.user_id,
+                    ReferralEarning.status == 'approved'
+                )
+            )
+        )
+        approved_commission = approved_commission_result.scalar() or 0
+        
+        response_data.append({
+            "id": aff.id,
+            "user_id": aff.user_id,
+            "referral_code": aff.referral_code,
+            "status": aff.status.value if hasattr(aff.status, 'value') else aff.status,
+            "is_active": aff.is_active,
+            "total_referrals": stats.total_referrals if stats else 0,
+            "total_commission": float(total_commission),  # Sum of all L1+L2+L3 commissions
+            "available_balance": float(approved_commission),  # Approved commissions available for payout
+            "created_at": aff.created_at.isoformat() if aff.created_at else None,
+            "user": {
+                "email": user.email if user else "N/A",
+                "full_name": user.full_name if user else "N/A"
+            }
+        })
+    
+    return response_data
 
 
 @router.get("/admin/payouts/pending")
@@ -525,8 +579,9 @@ async def get_pending_payouts(
     db: AsyncSession = Depends(get_db),
     current_user: UserProfile = Depends(get_current_admin_user)
 ):
-    """Get all pending payouts (Admin only)"""
+    """Get all pending payouts with user details (Admin only)"""
     from app.models.affiliate import Payout, PayoutStatus
+    from app.models.users import UserProfile as UP
     from sqlalchemy import select
     
     result = await db.execute(
@@ -536,7 +591,30 @@ async def get_pending_payouts(
     )
     payouts = result.scalars().all()
     
-    return [PayoutResponse.from_orm(p) for p in payouts]
+    # Build response with user details
+    response_data = []
+    for payout in payouts:
+        # Get user details
+        user_result = await db.execute(
+            select(UP).where(UP.id == payout.affiliate_user_id)
+        )
+        user = user_result.scalar_one_or_none()
+        
+        response_data.append({
+            "id": payout.id,
+            "affiliate_user_id": payout.affiliate_user_id,
+            "amount": float(payout.amount),
+            "status": payout.status.value if hasattr(payout.status, 'value') else payout.status,
+            "payment_method": payout.payment_method,
+            "requested_at": payout.requested_at.isoformat() if payout.requested_at else None,
+            "processed_at": payout.processed_at.isoformat() if payout.processed_at else None,
+            "user": {
+                "email": user.email if user else "N/A",
+                "full_name": user.full_name if user else "N/A"
+            }
+        })
+    
+    return response_data
 
 
 @router.post("/admin/payouts/{payout_id}/process", response_model=PayoutResponse)
