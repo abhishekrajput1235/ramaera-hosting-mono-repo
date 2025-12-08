@@ -3,6 +3,7 @@ Affiliate/Referral System Models
 Handles multi-level referral tracking, commissions, and payouts
 """
 from sqlalchemy import Column, String, Integer, Boolean, DateTime, ForeignKey, Numeric, Text, Enum as SQLEnum
+from sqlalchemy.dialects.postgresql import JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.core.database import Base
@@ -219,9 +220,23 @@ class Payout(Base):
     # Affiliate receiving payout
     affiliate_user_id = Column(Integer, ForeignKey('users_profiles.id', ondelete='CASCADE'), nullable=False, index=True)
     
+    # Payout type and linkage
+    payout_type = Column(String(20), default='total', nullable=False)  # 'total' or 'individual'
+    earning_id = Column(Integer, ForeignKey('referral_earnings.id'), nullable=True, index=True)  # For individual payouts
+    
     # Payout details
-    amount = Column(Numeric(10, 2), nullable=False)
+    amount = Column(Numeric(10, 2), nullable=False)  # Original requested amount
     currency = Column(String(3), default='INR')
+    
+    # Tax deduction (TDS - Tax Deducted at Source)
+    gross_amount = Column(Numeric(10, 2), nullable=True)  # Amount before tax
+    tds_rate = Column(Numeric(5, 2), default=0, nullable=False)  # TDS percentage (e.g., 10.00%)
+    tds_amount = Column(Numeric(10, 2), default=0, nullable=False)  # Tax deducted
+    net_amount = Column(Numeric(10, 2), nullable=False)  # Amount after tax (what user receives)
+    
+    # Tax tracking
+    financial_year = Column(String(10), nullable=True)  # e.g., "2024-25"
+    tds_certificate_url = Column(String(500), nullable=True)  # S3 link to Form 16A/TDS certificate
     
     # Payment method
     payment_method = Column(String(50), nullable=False)  # 'bank_transfer', 'upi', 'paypal', etc.
@@ -242,6 +257,10 @@ class Payout(Base):
     # Notes and remarks
     notes = Column(Text, nullable=True)
     admin_notes = Column(Text, nullable=True)
+    rejection_reason = Column(Text, nullable=True)  # Detailed reason if rejected
+    
+    # History tracking
+    status_history = Column(JSON, nullable=True)  # Array of status changes with timestamps
     
     # Metadata
     created_at = Column(DateTime(timezone=True), server_default=func.now())
@@ -249,6 +268,7 @@ class Payout(Base):
     
     # Relationships
     commissions = relationship("Commission", back_populates="payout")
+    # Note: earning relationship will be added after importing ReferralEarning model
     
     def __repr__(self):
         return f"<Payout(id={self.id}, affiliate_user_id={self.affiliate_user_id}, amount={self.amount}, status='{self.status}')>"

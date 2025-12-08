@@ -109,6 +109,8 @@ export function ReferralsEnhanced() {
   // Payout request modal state
   const [showPayoutModal, setShowPayoutModal] = useState(false);
   const [payoutForm, setPayoutForm] = useState({
+    payout_type: 'total' as 'total' | 'individual',
+    earning_id: undefined as number | undefined,
     amount: 0,
     payment_method: 'bank_transfer',
     account_number: '',
@@ -370,18 +372,41 @@ export function ReferralsEnhanced() {
   };
 
   const openPayoutModal = (isTotal: boolean = false, amount?: number) => {
-    if (isTotal && (!stats || stats.available_balance < 500)) {
-      alert('Minimum total payout amount is ₹500. Your current balance: ₹' + (stats?.available_balance || 0));
+    // Calculate available balance based on approved commission minus what's been paid
+    // approved_commission represents earnings that are ready for payout
+    const approvedAmount = Number(stats?.approved_commission || 0);
+    const paidAmount = Number(stats?.paid_commission || stats?.total_payout_amount || 0);
+    const calculatedBalance = approvedAmount - paidAmount;
+
+    // Use the calculated balance or fallback to stats.available_balance
+    // Prefer calculated balance as it's more accurate
+    const availableBalance = Number(calculatedBalance > 0 ? calculatedBalance : (stats?.available_balance || 0));
+
+    console.log('Payout Modal Debug:', {
+      approved_commission: stats?.approved_commission,
+      paid_commission: stats?.paid_commission,
+      total_payout_amount: stats?.total_payout_amount,
+      calculatedBalance,
+      availableBalance,
+      stats_available_balance: stats?.available_balance
+    });
+
+    if (isTotal && (!stats || availableBalance < 500)) {
+      alert('Minimum total payout amount is ₹500. Your current balance: ₹' + availableBalance.toFixed(2));
       return;
     }
-    if (isTotal && stats && stats.available_balance > 20000) {
+    if (isTotal && availableBalance > 20000) {
       alert('Maximum payout per day is ₹20,000. Please request ₹20,000 or contact support for higher amounts.');
       return;
     }
-    // Set form amount
-    const payoutAmount = isTotal ? Math.min(stats?.available_balance || 0, 20000) : (amount || stats?.available_balance || 0);
+    // Set form amount and payout type
+    const payoutAmount = isTotal ? Math.min(availableBalance, 20000) : (amount || availableBalance);
+    const payout_type = isTotal ? 'total' : 'individual';
+
     setPayoutForm(prev => ({
       ...prev,
+      payout_type,
+      earning_id: isTotal ? undefined : (amount ? undefined : prev.earning_id), // For individual, earning_id set elsewhere
       amount: payoutAmount,
       account_holder: profile?.full_name || '',
       notes: isTotal ? 'Total available balance payout request' : prev.notes
@@ -416,10 +441,14 @@ export function ReferralsEnhanced() {
       });
 
       await api.post('/api/v1/affiliate/payouts/request', {
+        payout_type: payoutForm.payout_type,
+        earning_id: payoutForm.earning_id,
         amount: payoutForm.amount,
         payment_method: payoutForm.payment_method,
         payment_details,
-        notes: payoutForm.notes || 'Referral commission payout request'
+        notes: payoutForm.notes || 'Referral commission payout request',
+        apply_tds: false,  // Default: no TDS (can be made configurable later)
+        tds_rate: 0        // 0% TDS by default
       });
 
       setShowPayoutModal(false);
@@ -427,6 +456,8 @@ export function ReferralsEnhanced() {
 
       // Reset form
       setPayoutForm({
+        payout_type: 'total',
+        earning_id: undefined,
         amount: 0,
         payment_method: 'bank_transfer',
         account_number: '',
@@ -436,9 +467,19 @@ export function ReferralsEnhanced() {
       });
 
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Payout request failed:', error);
-      alert('❌ Failed to request payout. Please try again.');
+
+      // Show detailed error message from backend if available
+      let errorMessage = '❌ Failed to request payout.';
+      if (error?.response?.data?.detail) {
+        errorMessage = `❌ ${error.response.data.detail}`;
+      } else if (error?.message) {
+        errorMessage = `❌ ${error.message}`;
+      }
+
+      alert(errorMessage);
+      console.log('Full error details:', error?.response?.data || error);
     }
   };
 
@@ -498,6 +539,24 @@ export function ReferralsEnhanced() {
     stats?.total_commission_earned ||
     legacyStats?.total_earnings ||
     0;
+
+  // Calculate actual available balance (approved - paid)
+  const approvedAmount = stats?.approved_commission || 0;
+  const paidAmount = stats?.paid_commission || stats?.total_payout_amount || 0;
+  const calculatedAvailableBalance = approvedAmount - paidAmount;
+  const displayAvailableBalance = calculatedAvailableBalance > 0 ? calculatedAvailableBalance : (stats?.available_balance || 0);
+
+  // Debug logging
+  console.log('Stats Debug:', {
+    total_commission_earned: stats?.total_commission_earned,
+    approved_commission: stats?.approved_commission,
+    pending_commission: stats?.pending_commission,
+    paid_commission: stats?.paid_commission,
+    total_payout_amount: stats?.total_payout_amount,
+    stats_available_balance: stats?.available_balance,
+    calculatedAvailableBalance,
+    displayAvailableBalance
+  });
 
 
   return (
@@ -642,9 +701,12 @@ export function ReferralsEnhanced() {
               <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-cyan-400" />
             </div>
             <div className="text-2xl sm:text-3xl font-bold text-white mb-1">
-              ₹{stats?.available_balance?.toLocaleString() || legacyStats?.available_balance?.toLocaleString() || 0}
+              ₹{displayAvailableBalance.toLocaleString()}
             </div>
             <div className="text-xs sm:text-sm text-slate-400 mb-2">Available Balance</div>
+            {displayAvailableBalance !== stats?.available_balance && (
+              <div className="text-xs text-yellow-400 mb-2">Calculated: ₹{calculatedAvailableBalance.toFixed(2)} (Backend: ₹{stats?.available_balance || 0})</div>
+            )}
             {stats?.can_request_payout && (
               <button
                 onClick={() => openPayoutModal(true)}
@@ -846,60 +908,55 @@ export function ReferralsEnhanced() {
 
             {/* Commissions Tab */}
             {activeTab === 'commissions' && (
-              <div className="space-y-4">
+              <div className="bg-slate-950/60 rounded-lg p-6 border border-slate-900">
+                <h3 className="text-xl font-semibold text-white mb-4">Commission History</h3>
                 <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b border-slate-700">
-                        <th className="text-left py-3 px-4 text-slate-400 font-semibold">Date</th>
-                        <th className="text-left py-3 px-4 text-slate-400 font-semibold">From</th>
-                        <th className="text-left py-3 px-4 text-slate-400 font-semibold">Level</th>
-                        <th className="text-left py-3 px-4 text-slate-400 font-semibold">Order Amount</th>
-                        <th className="text-left py-3 px-4 text-slate-400 font-semibold">Rate</th>
-                        <th className="text-left py-3 px-4 text-slate-400 font-semibold">Commission</th>
-                        <th className="text-left py-3 px-4 text-slate-400 font-semibold">Status</th>
+                  <table className="min-w-full">
+                    <thead className="bg-slate-950/70">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Level</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Order Amount</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Rate</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Commission</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-slate-500 uppercase">Date</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      {commissions.map(comm => (
-                        <tr key={comm.id} className="border-b border-slate-800 hover:bg-slate-800/50">
-                          <td className="py-3 px-4 text-slate-300 text-sm">
-                            {new Date(comm.created_at).toLocaleDateString()}
-                          </td>
-                          <td className="py-3 px-4 text-slate-300 text-sm">
-                            {comm.referred_user_email || 'N/A'}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className="px-2 py-1 rounded-full text-xs font-semibold bg-cyan-500/20 text-cyan-400">
-                              L{comm.level}
-                            </span>
-                          </td>
-                          <td className="py-3 px-4 text-white">
-                            ₹{comm.order_amount.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-4 text-slate-300">
-                            {comm.commission_rate}%
-                          </td>
-                          <td className="py-3 px-4 text-green-400 font-bold">
-                            ₹{comm.commission_amount.toLocaleString()}
-                          </td>
-                          <td className="py-3 px-4">
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${comm.status === 'paid' ? 'bg-green-500/20 text-green-400' :
-                              comm.status === 'approved' ? 'bg-blue-500/20 text-blue-400' :
-                                'bg-yellow-500/20 text-yellow-400'
-                              }`}>
-                              {comm.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
+                    <tbody className="bg-slate-950/60 divide-y divide-gray-700">
+                      {commissions
+                        .filter(comm => comm.status !== 'paid' && comm.status !== 'completed')
+                        .map(comm => (
+                          <tr key={comm.id}>
+                            <td className="px-4 py-3 text-sm text-white">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${comm.level === 1 ? 'bg-green-100 text-green-800' :
+                                comm.level === 2 ? 'bg-blue-100 text-blue-800' :
+                                  'bg-purple-100 text-purple-800'
+                                }`}>
+                                L{comm.level}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-white">₹{comm.order_amount?.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-sm text-white">{comm.commission_rate}%</td>
+                            <td className="px-4 py-3 text-sm font-bold text-green-600">₹{comm.commission_amount?.toFixed(2)}</td>
+                            <td className="px-4 py-3 text-sm">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${comm.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                comm.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                {comm.status}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3 text-sm text-slate-500">
+                              {comm.earned_at ? new Date(comm.earned_at).toLocaleDateString() : 'N/A'}
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </table>
                 </div>
 
-                {commissions.length === 0 && (
-                  <div className="text-center py-12 text-slate-400">
-                    <DollarSign className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                {commissions.filter(comm => comm.status !== 'paid' && comm.status !== 'completed').length === 0 && (
+                  <div className="text-center py-12 text-slate-500">
                     <p>No commissions yet. Commissions will appear here when your referrals make purchases.</p>
                   </div>
                 )}
@@ -973,6 +1030,8 @@ export function ReferralsEnhanced() {
                           onClick={() => {
                             setPayoutForm({
                               ...payoutForm,
+                              payout_type: 'individual',
+                              earning_id: Number(e.id),
                               amount: e.commission_amount,
                               notes: `Payout request for Level ${e.level} commission (Order: ${formatCurrency(e.order_amount)})`
                             });
@@ -1077,141 +1136,214 @@ export function ReferralsEnhanced() {
       {/* Payout Request Modal */}
       {showPayoutModal && (
         <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-900 rounded-2xl border-2 border-cyan-500 max-w-md w-full shadow-2xl">
-            <div className="p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-white">Request Payout</h2>
+
+          <div className="
+      bg-slate-900 rounded-2xl border-2 border-cyan-500 
+      w-full max-w-md
+      max-h-[90vh]
+      shadow-2xl
+      flex flex-col
+    ">
+
+            {/* HEADER */}
+            <div className="p-5 sm:p-6 border-b border-cyan-500/20">
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl sm:text-2xl font-bold text-white">
+                  Request Payout
+                </h2>
+
                 <button
                   onClick={() => setShowPayoutModal(false)}
                   className="text-slate-400 hover:text-white transition"
+                  aria-label="Close"
                 >
                   <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </button>
               </div>
+            </div>
 
-              <div className="space-y-4">
-                {/* Amount */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Amount (₹)
-                  </label>
-                  <input
-                    type="number"
-                    value={payoutForm.amount}
-                    onChange={(e) => setPayoutForm({ ...payoutForm, amount: parseFloat(e.target.value) })}
-                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
-                    placeholder="Enter amount"
-                    min="500"
-                  />
-                  <p className="text-xs text-slate-400 mt-1">Minimum: ₹500 | Available: ₹{stats?.available_balance?.toLocaleString() || 0}</p>
-                </div>
+            {/* SCROLLABLE BODY */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-4 custom-scroll">
 
-                {/* Payment Method */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Payment Method
-                  </label>
-                  <select
-                    value={payoutForm.payment_method}
-                    onChange={(e) => setPayoutForm({ ...payoutForm, payment_method: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
-                  >
-                    <option value="bank_transfer">Bank Transfer (NEFT/IMPS)</option>
-                    <option value="upi">UPI</option>
-                  </select>
-                </div>
+              {/* Amount */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Amount (₹)
+                </label>
 
-                {/* Account Holder Name */}
+                <input
+                  type="number"
+                  value={payoutForm.amount}
+                  disabled
+                  onChange={(e) =>
+                    setPayoutForm({
+                      ...payoutForm,
+                      amount: parseFloat(e.target.value),
+                    })
+                  }
+                  className="w-full px-4 py-2.5 bg-slate-800 border border-cyan-500/30 rounded-lg text-white disabled:opacity-50 disabled:cursor-not-allowed focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                  min="500"
+                  placeholder="Enter amount"
+                />
+
+                <p className="text-xs text-slate-400 mt-1">
+                  Minimum: ₹500 | Available: ₹{stats?.available_balance?.toLocaleString() || 0}
+                </p>
+              </div>
+
+              {/* Payment Method */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Payment Method
+                </label>
+
+                <select
+                  value={payoutForm.payment_method}
+                  onChange={(e) =>
+                    setPayoutForm({
+                      ...payoutForm,
+                      payment_method: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value="bank_transfer">
+                    Bank Transfer (NEFT / IMPS)
+                  </option>
+                  <option value="upi">UPI</option>
+                </select>
+              </div>
+
+              {/* Account Holder Name */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Account Holder Name
+                </label>
+
+                <input
+                  type="text"
+                  value={payoutForm.account_holder}
+                  onChange={(e) =>
+                    setPayoutForm({
+                      ...payoutForm,
+                      account_holder: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
+                  placeholder="Full name as per bank"
+                />
+              </div>
+
+              {/* Account Number / UPI */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Account Number / UPI ID
+                </label>
+
+                <input
+                  type="text"
+                  value={payoutForm.account_number}
+                  onChange={(e) =>
+                    setPayoutForm({
+                      ...payoutForm,
+                      account_number: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
+                  placeholder={
+                    payoutForm.payment_method === "upi"
+                      ? "yourname@upi"
+                      : "Bank account number"
+                  }
+                />
+              </div>
+
+              {/* IFSC Code */}
+              {payoutForm.payment_method === "bank_transfer" && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Account Holder Name
+                  <label className="block text-sm font-medium text-slate-300 mb-1">
+                    IFSC Code
                   </label>
+
                   <input
                     type="text"
-                    value={payoutForm.account_holder}
-                    onChange={(e) => setPayoutForm({ ...payoutForm, account_holder: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
-                    placeholder="Full name as per bank"
+                    value={payoutForm.ifsc_code}
+                    onChange={(e) =>
+                      setPayoutForm({
+                        ...payoutForm,
+                        ifsc_code: e.target.value.toUpperCase(),
+                      })
+                    }
+                    maxLength={11}
+                    placeholder="BANK0001234"
+                    className="w-full px-4 py-2.5 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
                   />
                 </div>
+              )}
 
-                {/* Account Number */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Account Number / UPI ID
-                  </label>
-                  <input
-                    type="text"
-                    value={payoutForm.account_number}
-                    onChange={(e) => setPayoutForm({ ...payoutForm, account_number: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
-                    placeholder={payoutForm.payment_method === 'upi' ? 'yourname@upi' : 'Bank account number'}
-                  />
-                </div>
+              {/* Notes */}
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">
+                  Notes (Optional)
+                </label>
 
-                {/* IFSC Code (only for bank transfer) */}
-                {payoutForm.payment_method === 'bank_transfer' && (
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      IFSC Code
-                    </label>
-                    <input
-                      type="text"
-                      value={payoutForm.ifsc_code}
-                      onChange={(e) => setPayoutForm({ ...payoutForm, ifsc_code: e.target.value.toUpperCase() })}
-                      className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500"
-                      placeholder="BANK0001234"
-                      maxLength={11}
-                    />
-                  </div>
-                )}
+                <textarea
+                  rows={2}
+                  value={payoutForm.notes}
+                  onChange={(e) =>
+                    setPayoutForm({
+                      ...payoutForm,
+                      notes: e.target.value,
+                    })
+                  }
+                  className="w-full px-4 py-2.5 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 resize-none"
+                  placeholder="Any additional information..."
+                />
+              </div>
 
-                {/* Notes */}
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-2">
-                    Notes (Optional)
-                  </label>
-                  <textarea
-                    value={payoutForm.notes}
-                    onChange={(e) => setPayoutForm({ ...payoutForm, notes: e.target.value })}
-                    className="w-full px-4 py-3 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:ring-2 focus:ring-cyan-500 resize-none"
-                    placeholder="Any additional information..."
-                    rows={2}
-                  />
-                </div>
+              {/* Tax Info */}
+              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3">
+                <p className="text-xs text-cyan-300 mb-1">
+                  💡 Tax Deductions (Informational)
+                </p>
 
-                {/* Tax Info */}
-                <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3">
-                  <p className="text-xs text-cyan-300 mb-2">💡 Tax Deductions (Informational):</p>
-                  <div className="grid grid-cols-3 gap-2 text-xs text-white">
-                    <div>TDS 10%: ₹{(payoutForm.amount * 0.10).toFixed(2)}</div>
-                    <div>GST 18%: ₹{(payoutForm.amount * 0.18).toFixed(2)}</div>
-                    <div className="font-bold">Net: ₹{(payoutForm.amount * 0.72).toFixed(2)}</div>
-                  </div>
-                </div>
-
-                {/* Buttons */}
-                <div className="flex gap-3 pt-4">
-                  <button
-                    onClick={() => setShowPayoutModal(false)}
-                    className="flex-1 px-4 py-3 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800 transition font-semibold"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={requestPayout}
-                    className="flex-1 px-4 py-3 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 transition font-semibold shadow-lg"
-                  >
-                    Submit Request
-                  </button>
+                <div className="grid grid-cols-3 gap-1 text-xs text-white">
+                  <span>
+                    TDS 10% ₹{(payoutForm.amount * 0.10).toFixed(2)}
+                  </span>
+                  <span>
+                    GST 18% ₹{(payoutForm.amount * 0.18).toFixed(2)}
+                  </span>
+                  <span className="font-semibold text-emerald-400">
+                    NET ₹{(payoutForm.amount * 0.72).toFixed(2)}
+                  </span>
                 </div>
               </div>
             </div>
+
+            {/* FOOTER BUTTONS */}
+            <div className="p-4 sm:p-5 border-t border-cyan-500/20 flex gap-3">
+              <button
+                onClick={() => setShowPayoutModal(false)}
+                className="flex-1 py-2.5 border border-slate-700 rounded-lg text-slate-300 hover:bg-slate-800 transition font-semibold"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={requestPayout}
+                className="flex-1 py-2.5 bg-gradient-to-r from-green-600 to-emerald-600 text-white rounded-lg hover:from-green-500 hover:to-emerald-500 transition font-semibold shadow-lg"
+              >
+                Submit Request
+              </button>
+            </div>
+
           </div>
         </div>
       )}
+
     </div>
   );
 }

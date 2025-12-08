@@ -513,6 +513,12 @@ async def get_all_affiliates(
     from sqlalchemy import select, func, and_
     from sqlalchemy.orm import selectinload
     
+    # Get total count
+    count_result = await db.execute(
+        select(func.count(AffiliateSubscription.id))
+    )
+    total_count = count_result.scalar() or 0
+
     # Query affiliates with their stats
     result = await db.execute(
         select(AffiliateSubscription)
@@ -571,23 +577,39 @@ async def get_all_affiliates(
             }
         })
     
-    return response_data
+    return {
+        "items": response_data,
+        "total": total_count
+    }
 
 
 @router.get("/admin/payouts/pending")
 async def get_pending_payouts(
+    skip: int = 0,
+    limit: int = 50,
     db: AsyncSession = Depends(get_db),
     current_user: UserProfile = Depends(get_current_admin_user)
 ):
     """Get all pending payouts with user details (Admin only)"""
     from app.models.affiliate import Payout, PayoutStatus
     from app.models.users import UserProfile as UP
-    from sqlalchemy import select
+    from sqlalchemy import select, func, desc
     
+    # Get total count
+    count_result = await db.execute(
+        select(func.count(Payout.id)).where(
+            Payout.status.in_([PayoutStatus.PENDING, PayoutStatus.PROCESSING])
+        )
+    )
+    total_count = count_result.scalar() or 0
+
     result = await db.execute(
         select(Payout).where(
             Payout.status.in_([PayoutStatus.PENDING, PayoutStatus.PROCESSING])
         )
+        .order_by(desc(Payout.requested_at))
+        .offset(skip)
+        .limit(limit)
     )
     payouts = result.scalars().all()
     
@@ -603,18 +625,28 @@ async def get_pending_payouts(
         response_data.append({
             "id": payout.id,
             "affiliate_user_id": payout.affiliate_user_id,
+            "payout_type": payout.payout_type if hasattr(payout, 'payout_type') else 'total',
+            "earning_id": payout.earning_id if hasattr(payout, 'earning_id') else None,
             "amount": float(payout.amount),
+            "currency": payout.currency if hasattr(payout, 'currency') else 'INR',
             "status": payout.status.value if hasattr(payout.status, 'value') else payout.status,
             "payment_method": payout.payment_method,
+            "payment_details": payout.payment_details if hasattr(payout, 'payment_details') else None,
+            "notes": payout.notes if hasattr(payout, 'notes') else None,
+            "admin_notes": payout.admin_notes if hasattr(payout, 'admin_notes') else None,
             "requested_at": payout.requested_at.isoformat() if payout.requested_at else None,
             "processed_at": payout.processed_at.isoformat() if payout.processed_at else None,
+            "transaction_id": payout.transaction_id if hasattr(payout, 'transaction_id') else None,
             "user": {
                 "email": user.email if user else "N/A",
                 "full_name": user.full_name if user else "N/A"
             }
         })
     
-    return response_data
+    return {
+        "items": response_data,
+        "total": total_count
+    }
 
 
 @router.post("/admin/payouts/{payout_id}/process", response_model=PayoutResponse)
@@ -655,8 +687,15 @@ async def get_pending_earnings(
 ):
     """Get all pending commission earnings awaiting approval (Admin only)"""
     from app.models.referrals import ReferralEarning
-    from sqlalchemy import select, desc
+    from sqlalchemy import select, desc, func
     
+    # Get total count
+    count_result = await db.execute(
+        select(func.count(ReferralEarning.id))
+        .where(ReferralEarning.status == 'pending')
+    )
+    total_count = count_result.scalar() or 0
+
     result = await db.execute(
         select(ReferralEarning)
         .where(ReferralEarning.status == 'pending')
@@ -697,7 +736,10 @@ async def get_pending_earnings(
             "earned_at": e.earned_at.isoformat() if e.earned_at else None
         })
     
-    return earnings_list
+    return {
+        "items": earnings_list,
+        "total": total_count
+    }
 
 
 @router.post("/admin/earnings/{earning_id}/approve")
@@ -873,3 +915,69 @@ async def get_commission_rules(
     )
     rules = result.scalars().all()
     return [CommissionRuleResponse.from_orm(r) for r in rules]
+
+
+@router.get("/admin/payouts/history")
+async def get_payout_history(
+    skip: int = 0,
+    limit: int = 50,
+    db: AsyncSession = Depends(get_db),
+    current_user: UserProfile = Depends(get_current_admin_user)
+):
+    """Get completed, failed, and cancelled payouts (Admin only)"""
+    from app.models.affiliate import Payout, PayoutStatus
+    from app.models.users import UserProfile as UP
+    from sqlalchemy import select, func
+    
+    # Get total count
+    count_result = await db.execute(
+        select(func.count(Payout.id)).where(
+            Payout.status.in_([PayoutStatus.COMPLETED, PayoutStatus.FAILED, PayoutStatus.CANCELLED])
+        )
+    )
+    total_count = count_result.scalar() or 0
+
+    result = await db.execute(
+        select(Payout).where(
+            Payout.status.in_([PayoutStatus.COMPLETED, PayoutStatus.FAILED, PayoutStatus.CANCELLED])
+        )
+        .order_by(Payout.processed_at.desc())
+        .offset(skip)
+        .limit(limit)
+    )
+    payouts = result.scalars().all()
+    
+    # Build response with user details
+    response_data = []
+    for payout in payouts:
+        # Get user details
+        user_result = await db.execute(
+            select(UP).where(UP.id == payout.affiliate_user_id)
+        )
+        user = user_result.scalar_one_or_none()
+        
+        response_data.append({
+            "id": payout.id,
+            "affiliate_user_id": payout.affiliate_user_id,
+            "payout_type": payout.payout_type if hasattr(payout, 'payout_type') else 'total',
+            "earning_id": payout.earning_id if hasattr(payout, 'earning_id') else None,
+            "amount": float(payout.amount),
+            "currency": payout.currency if hasattr(payout, 'currency') else 'INR',
+            "status": payout.status.value if hasattr(payout.status, 'value') else payout.status,
+            "payment_method": payout.payment_method,
+            "payment_details": payout.payment_details if hasattr(payout, 'payment_details') else None,
+            "notes": payout.notes if hasattr(payout, 'notes') else None,
+            "admin_notes": payout.admin_notes if hasattr(payout, 'admin_notes') else None,
+            "requested_at": payout.requested_at.isoformat() if payout.requested_at else None,
+            "processed_at": payout.processed_at.isoformat() if payout.processed_at else None,
+            "transaction_id": payout.transaction_id if hasattr(payout, 'transaction_id') else None,
+            "user": {
+                "email": user.email if user else "N/A",
+                "full_name": user.full_name if user else "N/A"
+            }
+        })
+    
+    return {
+        "items": response_data,
+        "total": total_count
+    }

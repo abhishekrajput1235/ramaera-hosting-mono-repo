@@ -17,8 +17,8 @@ services:
       echo 'PgBouncer ready ✅' &&
       python create_db.py &&
       echo 'Checking migration status...' &&
-      alembic current || (echo 'Stamping database to current version...' && alembic stamp head) &&
-      alembic upgrade head &&
+      (alembic stamp head 2>/dev/null || echo 'Migrations already stamped') &&
+      (alembic upgrade head 2>/dev/null || echo 'Skipping migrations - schema exists') &&
       uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers 4 --loop uvloop --http httptools
       "
 

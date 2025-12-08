@@ -38,15 +38,14 @@ export function AdminLayout() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#020617] via-[#05050f] to-[#020617] text-slate-100">
-      <div className="flex">
+    <div className="min-h-screen h-screen bg-gradient-to-br from-[#020617] via-[#05050f] to-[#020617] text-slate-100 overflow-hidden">
+      <div className="flex h-full">
         <aside
-          className={`fixed inset-y-0 left-0 z-50 w-[17rem] bg-slate-950/80 backdrop-blur-2xl border-r border-slate-900 shadow-[0_25px_65px_rgba(0,0,0,.65)] transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
-            sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-          }`}
+          className={`fixed inset-y-0 left-0 z-50 w-[17rem] bg-slate-950/80 backdrop-blur-2xl border-r border-slate-900 shadow-[0_25px_65px_rgba(0,0,0,.65)] transform transition-transform duration-200 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+            }`}
         >
           <div className="flex flex-col h-full">
-            <div className="flex items-center justify-between h-16 px-6 border-b border-slate-900/80">
+            <div className="flex items-center justify-between h-16 px-6 border-b border-slate-900/80 flex-shrink-0">
               <Link to="/admin" className="flex items-center space-x-3">
                 <div className="h-11 w-11 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white shadow-lg shadow-cyan-500/30">
                   <Server className="h-5 w-5" />
@@ -71,11 +70,10 @@ export function AdminLayout() {
                   <Link
                     key={link.to}
                     to={link.to}
-                    className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition border ${
-                      isActive
+                    className={`flex items-center space-x-3 px-4 py-3 rounded-xl transition border ${isActive
                         ? 'border-cyan-500/40 bg-gradient-to-r from-cyan-500/20 to-blue-500/20 text-white shadow-lg shadow-cyan-500/10'
                         : 'border-transparent text-slate-400 hover:border-slate-800 hover:bg-slate-900/60'
-                    }`}
+                      }`}
                   >
                     <link.icon className="h-5 w-5" />
                     <div className="flex-1">
@@ -87,7 +85,7 @@ export function AdminLayout() {
               })}
             </nav>
 
-            <div className="border-t border-slate-900/70 p-4">
+            <div className="border-t border-slate-900/70 p-4 flex-shrink-0">
               <div className="flex items-center space-x-3 px-4 py-3 bg-slate-950/70 rounded-xl mb-3 border border-slate-800">
                 <div className="w-11 h-11 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-2xl flex items-center justify-center text-white font-semibold shadow shadow-cyan-500/30">
                   {profile?.full_name?.charAt(0) || 'A'}
@@ -112,8 +110,8 @@ export function AdminLayout() {
           </div>
         </aside>
 
-        <div className="flex-1 flex flex-col min-h-screen">
-          <header className="sticky top-0 z-40 flex items-center h-16 px-4 sm:px-6 lg:px-8 bg-slate-950/80 backdrop-blur border-b border-slate-900 shadow-[0_10px_35px_rgba(2,6,23,0.8)]">
+        <div className="flex-1 flex flex-col min-h-screen h-full overflow-hidden">
+          <header className="flex-shrink-0 flex items-center h-16 px-4 sm:px-6 lg:px-8 bg-slate-950/80 backdrop-blur border-b border-slate-900 shadow-[0_10px_35px_rgba(2,6,23,0.8)]">
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden text-slate-400 hover:text-white mr-4"
@@ -132,7 +130,7 @@ export function AdminLayout() {
             </div>
           </header>
 
-          <main className="flex-1 p-4 sm:p-6 lg:p-8">
+          <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
             <div className="max-w-7xl mx-auto space-y-8">
               <Outlet />
             </div>

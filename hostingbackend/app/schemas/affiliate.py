@@ -98,15 +98,42 @@ class CommissionDetail(BaseModel):
 
 class PayoutRequest(BaseModel):
     """Create payout request"""
+    payout_type: str = Field(default='total', description="'total' for full balance, 'individual' for specific earning")
+    earning_id: Optional[int] = Field(None, description="Required for individual payouts - ID of specific earning")
     amount: Decimal = Field(..., gt=0, description="Amount to withdraw")
     payment_method: str = Field(..., description="bank_transfer, upi, paypal, etc")
     payment_details: str = Field(..., description="Account details as JSON string")
     notes: Optional[str] = None
+    
+    # Optional TDS configuration (Tax Deducted at Source)
+    apply_tds: bool = Field(default=False, description="Whether to apply TDS")
+    tds_rate: Optional[Decimal] = Field(None, ge=0, le=30, description="TDS percentage (0-30%)")
+
+    @validator('payout_type')
+    def validate_payout_type(cls, v):
+        if v not in ['total', 'individual']:
+            raise ValueError("payout_type must be either 'total' or 'individual'")
+        return v
+    
+    @validator('earning_id')
+    def validate_earning_id(cls, v, values):
+        payout_type = values.get('payout_type')
+        if payout_type == 'individual' and not v:
+            raise ValueError('earning_id is required for individual payouts')
+        return v
 
     @validator('amount')
-    def validate_minimum_amount(cls, v):
-        if v < Decimal('500'):
-            raise ValueError('Minimum payout amount is ₹500')
+    def validate_amount(cls, v, values):
+        payout_type = values.get('payout_type', 'total')
+        
+        # Maximum limit for all payout types
+        if v > Decimal('20000'):
+            raise ValueError('Maximum payout amount is ₹20,000 per day')
+        
+        # Minimum limit only for total payouts
+        if payout_type == 'total' and v < Decimal('500'):
+            raise ValueError('Minimum total payout amount is ₹500')
+        
         return v
 
 
@@ -114,15 +141,28 @@ class PayoutResponse(BaseModel):
     """Payout response"""
     id: int
     affiliate_user_id: int
+    payout_type: str
+    earning_id: Optional[int]
     amount: Decimal
     currency: str
+    
+    # Tax deduction fields
+    gross_amount: Optional[Decimal] = None
+    tds_rate: Decimal = Decimal('0')
+    tds_amount: Decimal = Decimal('0')
+    net_amount: Decimal
+    financial_year: Optional[str] = None
+    tds_certificate_url: Optional[str] = None
+    
     payment_method: str
+    payment_details: Optional[str]  # JSON string with bank account details
     status: str
     requested_at: datetime
     processed_at: Optional[datetime]
     transaction_id: Optional[str]
     notes: Optional[str]
     admin_notes: Optional[str]
+    rejection_reason: Optional[str] = None
 
     class Config:
         from_attributes = True
