@@ -447,8 +447,8 @@ export function ReferralsEnhanced() {
         payment_method: payoutForm.payment_method,
         payment_details,
         notes: payoutForm.notes || 'Referral commission payout request',
-        apply_tds: false,  // Default: no TDS (can be made configurable later)
-        tds_rate: 0        // 0% TDS by default
+        apply_tds: true,   // Apply TDS by default
+        tds_rate: 10       // 10% TDS as per Indian tax regulations
       });
 
       setShowPayoutModal(false);
@@ -993,58 +993,60 @@ export function ReferralsEnhanced() {
                     </div>
                   );
                 })()}
-                {earnings.length === 0 && (
+                {/* Filter earnings to exclude 'paid' status - those should only show in Payouts tab */}
+                {earnings.filter(e => (e as any).status !== 'paid').length === 0 && (
                   <div className="text-center py-12 text-slate-400">
                     <TrendingUp className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                    <p>No earnings yet. When your referrals generate commissions, they will appear here.</p>
+                    <p>No pending or approved earnings. Paid earnings are shown in the Payouts tab.</p>
                   </div>
                 )}
-                {earnings.map(e => (
-                  <div key={String(e.id)} className="bg-slate-800 rounded-lg p-4 border border-cyan-500/30">
-                    <div className="flex justify-between mb-2">
-                      <div>
-                        <div className="text-white font-semibold">Level {e.level} Commission</div>
-                        <div className="text-xs text-slate-400">{new Date(e.created_at).toLocaleString()}</div>
+                {earnings
+                  .filter(e => (e as any).status !== 'paid') // Only show pending and approved earnings
+                  .map(e => (
+                    <div key={String(e.id)} className="bg-slate-800 rounded-lg p-4 border border-cyan-500/30">
+                      <div className="flex justify-between mb-2">
+                        <div>
+                          <div className="text-white font-semibold">Level {e.level} Commission</div>
+                          <div className="text-xs text-slate-400">{new Date(e.created_at).toLocaleString()}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-green-400 font-bold text-lg">+{formatCurrency(e.commission_amount)}</div>
+                          <div className="text-xs text-slate-500">Order: {formatCurrency(e.order_amount)}</div>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <div className="text-green-400 font-bold text-lg">+{formatCurrency(e.commission_amount)}</div>
-                        <div className="text-xs text-slate-500">Order: {formatCurrency(e.order_amount)}</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between pt-2 border-t border-slate-700 text-xs">
-                      <div className="flex items-center gap-2">
-                        <span className="text-slate-400">Rate: {e.commission_percentage}%</span>
-                        {e.is_recurring && (
-                          <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full border border-cyan-500/30">Recurring</span>
-                        )}
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${(e as any).status === 'approved' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
-                          (e as any).status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
-                            (e as any).status === 'paid' ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' :
+                      <div className="flex items-center justify-between pt-2 border-t border-slate-700 text-xs">
+                        <div className="flex items-center gap-2">
+                          <span className="text-slate-400">Rate: {e.commission_percentage}%</span>
+                          {e.is_recurring && (
+                            <span className="px-2 py-0.5 bg-cyan-500/20 text-cyan-400 rounded-full border border-cyan-500/30">Recurring</span>
+                          )}
+                          <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${(e as any).status === 'approved' ? 'bg-green-500/20 text-green-400 border border-green-500/30' :
+                            (e as any).status === 'pending' ? 'bg-yellow-500/20 text-yellow-400 border border-yellow-500/30' :
                               'bg-slate-500/20 text-slate-400 border border-slate-500/30'
-                          }`}>
-                          {(e as any).status || 'pending'}
-                        </span>
+                            }`}>
+                            {(e as any).status || 'pending'}
+                          </span>
+                        </div>
+                        {((e as any).status === 'approved' || !(e as any).status) && (
+                          <button
+                            onClick={() => {
+                              setPayoutForm({
+                                ...payoutForm,
+                                payout_type: 'individual',
+                                earning_id: Number(e.id),
+                                amount: e.commission_amount,
+                                notes: `Payout request for Level ${e.level} commission (Order: ${formatCurrency(e.order_amount)})`
+                              });
+                              setShowPayoutModal(true);
+                            }}
+                            className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition"
+                          >
+                            Request Payout
+                          </button>
+                        )}
                       </div>
-                      {((e as any).status === 'approved' || !(e as any).status) && (
-                        <button
-                          onClick={() => {
-                            setPayoutForm({
-                              ...payoutForm,
-                              payout_type: 'individual',
-                              earning_id: Number(e.id),
-                              amount: e.commission_amount,
-                              notes: `Payout request for Level ${e.level} commission (Order: ${formatCurrency(e.order_amount)})`
-                            });
-                            setShowPayoutModal(true);
-                          }}
-                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition"
-                        >
-                          Request Payout
-                        </button>
-                      )}
                     </div>
-                  </div>
-                ))}
+                  ))}
               </div>
             )}
 
@@ -1096,23 +1098,22 @@ export function ReferralsEnhanced() {
                             <div className="text-xs text-slate-500">Net Amount</div>
                           </div>
                         </div>
-                        <div className="grid grid-cols-4 gap-3 text-xs">
+                        <div className="grid grid-cols-3 gap-3 text-xs">
                           <div className="bg-slate-900 rounded p-2">
-                            <div className="text-slate-400 mb-1">Gross</div>
+                            <div className="text-slate-400 mb-1">Gross Amount</div>
                             <div className="text-white font-semibold">{formatCurrency(p.gross_amount)}</div>
                           </div>
                           <div className="bg-slate-900 rounded p-2">
-                            <div className="text-slate-400 mb-1">TDS</div>
-                            <div className="text-white">{formatCurrency(p.tds_amount)}</div>
+                            <div className="text-slate-400 mb-1">TDS (10%)</div>
+                            <div className="text-orange-400 font-semibold">- {formatCurrency(p.tds_amount)}</div>
                           </div>
                           <div className="bg-slate-900 rounded p-2">
-                            <div className="text-slate-400 mb-1">GST</div>
-                            <div className="text-white">{formatCurrency(p.service_tax_amount)}</div>
+                            <div className="text-slate-400 mb-1">Net Amount</div>
+                            <div className="text-emerald-400 font-bold">{formatCurrency(p.net_amount)}</div>
                           </div>
-                          <div className="bg-slate-900 rounded p-2">
-                            <div className="text-slate-400 mb-1">Method</div>
-                            <div className="text-white capitalize">{p.payment_method.replace('_', ' ')}</div>
-                          </div>
+                        </div>
+                        <div className="mt-3 text-xs text-slate-400">
+                          Payment Method: <span className="text-white capitalize">{p.payment_method.replace('_', ' ')}</span>
                         </div>
                         <div className="flex justify-between text-xs mt-3">
                           <span className="text-slate-400">Tax Period: {p.tax_year} Q{p.tax_quarter}</span>
@@ -1304,22 +1305,33 @@ export function ReferralsEnhanced() {
               </div>
 
               {/* Tax Info */}
-              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-3">
-                <p className="text-xs text-cyan-300 mb-1">
-                  💡 Tax Deductions (Informational)
+              <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
+                <p className="text-sm font-semibold text-cyan-300 mb-3">
+                  💡 Tax Deduction (TDS)
                 </p>
 
-                <div className="grid grid-cols-3 gap-1 text-xs text-white">
-                  <span>
-                    TDS 10% ₹{(payoutForm.amount * 0.10).toFixed(2)}
-                  </span>
-                  <span>
-                    GST 18% ₹{(payoutForm.amount * 0.18).toFixed(2)}
-                  </span>
-                  <span className="font-semibold text-emerald-400">
-                    NET ₹{(payoutForm.amount * 0.72).toFixed(2)}
-                  </span>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between text-white">
+                    <span className="text-slate-400">Gross Amount:</span>
+                    <span className="font-semibold">₹{payoutForm.amount.toLocaleString()}</span>
+                  </div>
+
+                  <div className="flex justify-between text-orange-400">
+                    <span className="text-slate-400">TDS (10%):</span>
+                    <span className="font-semibold">- ₹{(payoutForm.amount * 0.10).toFixed(2)}</span>
+                  </div>
+
+                  <div className="h-px bg-cyan-500/30 my-2"></div>
+
+                  <div className="flex justify-between text-emerald-400 text-base">
+                    <span className="font-semibold">Net Amount:</span>
+                    <span className="font-bold">₹{(payoutForm.amount * 0.90).toFixed(2)}</span>
+                  </div>
                 </div>
+
+                <p className="text-xs text-slate-400 mt-3">
+                  * TDS certificate will be provided as per Income Tax regulations
+                </p>
               </div>
             </div>
 

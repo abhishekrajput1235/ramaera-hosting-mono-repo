@@ -944,26 +944,45 @@ class AffiliateService:
         """Mark commissions as paid for a payout - updates both Commission and ReferralEarning"""
         from app.models.referrals import ReferralEarning
         
-        # Mark ReferralEarnings as paid (used by dashboard)
-        earnings_result = await db.execute(
-            select(ReferralEarning).where(
-                and_(
-                    ReferralEarning.user_id == user_id,
-                    ReferralEarning.status == 'approved'
-                )
-            ).order_by(ReferralEarning.earned_at)
+        # Get the payout to check if it's individual or total
+        payout_result = await db.execute(
+            select(Payout).where(Payout.id == payout_id)
         )
-        earnings = earnings_result.scalars().all()
+        payout = payout_result.scalar_one_or_none()
         
-        remaining_for_earnings = amount
-        for earning in earnings:
-            if remaining_for_earnings <= 0:
-                break
-            earning.status = 'paid'
-            remaining_for_earnings -= earning.commission_amount
+        if not payout:
+            return
         
-        # Also mark legacy Commission records as paid
-        # Get approved commissions up to the payout amount
+        # Handle individual payout - mark specific earning as paid
+        if payout.payout_type == 'individual' and payout.earning_id:
+            earning_result = await db.execute(
+                select(ReferralEarning).where(ReferralEarning.id == payout.earning_id)
+            )
+            earning = earning_result.scalar_one_or_none()
+            if earning:
+                earning.status = 'paid'
+                earning.paid_at = datetime.utcnow()
+        else:
+            # Handle total payout - mark approved earnings up to the payout amount
+            earnings_result = await db.execute(
+                select(ReferralEarning).where(
+                    and_(
+                        ReferralEarning.user_id == user_id,
+                        ReferralEarning.status == 'approved'
+                    )
+                ).order_by(ReferralEarning.earned_at)
+            )
+            earnings = earnings_result.scalars().all()
+            
+            remaining_for_earnings = amount
+            for earning in earnings:
+                if remaining_for_earnings <= 0:
+                    break
+                earning.status = 'paid'
+                earning.paid_at = datetime.utcnow()
+                remaining_for_earnings -= earning.commission_amount
+        
+        # Also mark legacy Commission records as paid (if they exist)
         result = await db.execute(
             select(Commission).where(
                 and_(

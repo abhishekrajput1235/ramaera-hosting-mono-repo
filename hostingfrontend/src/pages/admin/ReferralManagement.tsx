@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Users, Search, RefreshCw, DollarSign, CreditCard } from 'lucide-react';
 import api from '../../lib/api';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
@@ -26,10 +26,17 @@ interface PayoutData {
   payout_type?: string;
   earning_id?: number;
   amount: number;
+  gross_amount?: number;
+  tds_amount?: number;
+  net_amount?: number;
+  financial_year?: string;
   status: string;
   payment_method: string;
   payment_details?: string;
   notes?: string;
+  admin_notes?: string;
+  rejection_reason?: string;
+  transaction_id?: string;
   requested_at: string;
   processed_at: string | null;
   user?: {
@@ -83,6 +90,7 @@ export function ReferralManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState<'affiliates' | 'commissions' | 'payouts' | 'history'>('affiliates');
+  const [expandedRows, setExpandedRows] = useState<Set<number>>(new Set());
 
   // Fetch functions
   const fetchAffiliates = useCallback(async (page: number) => {
@@ -269,6 +277,17 @@ export function ReferralManagement() {
     (aff.user?.full_name || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+
+  // Toggle expanded row state
+  const toggleRow = (id: number) => {
+    const newExpanded = new Set(expandedRows);
+    if (newExpanded.has(id)) {
+      newExpanded.delete(id);
+    } else {
+      newExpanded.add(id);
+    }
+    setExpandedRows(newExpanded);
+  };
 
   if (loading && affiliates.length === 0 && payouts.length === 0) {
     return (
@@ -699,48 +718,147 @@ export function ReferralManagement() {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">User</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Amount</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Method</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Gross / TDS / Net</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Requested</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Processed</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Dates</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase">Details</th>
                   </tr>
                 </thead>
                 <tbody className="bg-slate-950/60 divide-y divide-gray-200">
-                  {historyPayouts.map((payout) => (
-                    <tr key={payout.id} className="hover:bg-slate-950/70">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-white">{payout.user?.full_name || 'N/A'}</div>
-                        <div className="text-sm text-slate-500">{payout.user?.email || 'N/A'}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                          {payout.payout_type === 'individual' ? 'Individual' : 'Total'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-bold text-green-600">{formatCurrency(payout.amount)}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                        {payout.payment_method}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${(payout.status === 'COMPLETED' || payout.status === 'completed') ? 'bg-green-100 text-green-800' :
-                          (payout.status === 'FAILED' || payout.status === 'failed') ? 'bg-red-100 text-red-800' :
-                            (payout.status === 'CANCELLED' || payout.status === 'cancelled') ? 'bg-gray-100 text-gray-800' :
-                              'bg-slate-100 text-slate-800'
-                          }`}>
-                          {payout.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                        {formatDate(payout.requested_at)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                        {payout.processed_at ? formatDate(payout.processed_at) : 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
+                  {historyPayouts.map((payout) => {
+                    const paymentDetails = payout.payment_details ? JSON.parse(payout.payment_details) : null;
+                    const isExpanded = expandedRows.has(payout.id);
+
+                    return (
+                      <React.Fragment key={payout.id}>
+                        <tr className="hover:bg-slate-950/70">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-white">{payout.user?.full_name || 'N/A'}</div>
+                            <div className="text-sm text-slate-500">{payout.user?.email || 'N/A'}</div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {payout.payout_type === 'individual' ? 'Individual' : 'Total'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-xs space-y-1">
+                              <div className="text-slate-400">
+                                Gross: <span className="text-white font-semibold">{formatCurrency(payout.gross_amount || payout.amount)}</span>
+                              </div>
+                              <div className="text-orange-400">
+                                TDS: <span className="font-semibold">-{formatCurrency(payout.tds_amount || 0)}</span>
+                              </div>
+                              <div className="text-emerald-400 font-bold">
+                                Net: {formatCurrency(payout.net_amount || payout.amount)}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${(payout.status === 'COMPLETED' || payout.status === 'completed') ? 'bg-green-100 text-green-800' :
+                              (payout.status === 'FAILED' || payout.status === 'failed') ? 'bg-red-100 text-red-800' :
+                                (payout.status === 'CANCELLED' || payout.status === 'cancelled') ? 'bg-gray-100 text-gray-800' :
+                                  'bg-slate-100 text-slate-800'
+                              }`}>
+                              {payout.status}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-xs">
+                            <div className="space-y-1">
+                              <div className="text-slate-400">
+                                Req: <span className="text-white">{formatDate(payout.requested_at)}</span>
+                              </div>
+                              <div className="text-slate-400">
+                                Proc: <span className="text-white">{payout.processed_at ? formatDate(payout.processed_at) : 'N/A'}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <button
+                              onClick={() => toggleRow(payout.id)}
+                              className="text-cyan-400 hover:text-cyan-300 font-medium"
+                            >
+                              {isExpanded ? '▼ Hide' : '▶ Show'}
+                            </button>
+                          </td>
+                        </tr>
+
+                        {isExpanded && (
+                          <tr className="bg-slate-900">
+                            <td colSpan={6} className="px-6 py-4">
+                              <div className="grid grid-cols-2 gap-6">
+                                {/* Payment Details */}
+                                <div>
+                                  <h4 className="text-sm font-semibold text-cyan-400 mb-3">Payment Details</h4>
+                                  <div className="space-y-2 text-sm">
+                                    <div className="flex justify-between">
+                                      <span className="text-slate-400">Payment Method:</span>
+                                      <span className="text-white capitalize">{payout.payment_method?.replace('_', ' ')}</span>
+                                    </div>
+                                    {paymentDetails && (
+                                      <>
+                                        <div className="flex justify-between">
+                                          <span className="text-slate-400">Account Holder:</span>
+                                          <span className="text-white font-medium">{paymentDetails.account_holder || 'N/A'}</span>
+                                        </div>
+                                        <div className="flex justify-between">
+                                          <span className="text-slate-400">Account Number:</span>
+                                          <span className="text-white font-mono">{paymentDetails.account_number || 'N/A'}</span>
+                                        </div>
+                                        {paymentDetails.ifsc_code && (
+                                          <div className="flex justify-between">
+                                            <span className="text-slate-400">IFSC Code:</span>
+                                            <span className="text-white font-mono">{paymentDetails.ifsc_code}</span>
+                                          </div>
+                                        )}
+                                      </>
+                                    )}
+                                    {payout.transaction_id && (
+                                      <div className="flex justify-between">
+                                        <span className="text-slate-400">Transaction ID:</span>
+                                        <span className="text-green-400 font-mono text-xs">{payout.transaction_id}</span>
+                                      </div>
+                                    )}
+                                    {payout.financial_year && (
+                                      <div className="flex justify-between">
+                                        <span className="text-slate-400">Financial Year:</span>
+                                        <span className="text-white">{payout.financial_year}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Notes & Admin Info */}
+                                <div>
+                                  <h4 className="text-sm font-semibold text-cyan-400 mb-3">Notes & Info</h4>
+                                  <div className="space-y-2 text-sm">
+                                    {payout.notes && (
+                                      <div>
+                                        <span className="text-slate-400 block mb-1">User Notes:</span>
+                                        <span className="text-white text-xs">{payout.notes}</span>
+                                      </div>
+                                    )}
+                                    {payout.admin_notes && (
+                                      <div>
+                                        <span className="text-slate-400 block mb-1">Admin Notes:</span>
+                                        <span className="text-white text-xs">{payout.admin_notes}</span>
+                                      </div>
+                                    )}
+                                    {payout.rejection_reason && (
+                                      <div>
+                                        <span className="text-red-400 block mb-1">Rejection Reason:</span>
+                                        <span className="text-red-300 text-xs">{payout.rejection_reason}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
 

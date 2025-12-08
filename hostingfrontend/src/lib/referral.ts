@@ -46,6 +46,11 @@ interface PayoutResponseBackend {
   id: number;
   affiliate_user_id: number;
   amount: number | string;
+  gross_amount?: number | string;
+  tds_rate?: number | string;
+  tds_amount?: number | string;
+  net_amount: number | string;
+  financial_year?: string;
   currency: string;
   payment_method: string;
   status: string; // backend enum values: pending, processing, completed, failed, cancelled
@@ -128,29 +133,33 @@ export const getReferralStats = async (): Promise<ReferralStats | null> => {
 // Adapter: CommissionDetailResponse[] -> ReferralEarning[]
 export const getReferralEarnings = async (): Promise<ReferralEarning[]> => {
   try {
+    // Fetch all earnings EXCEPT those with 'paid' status
+    // This ensures paid earnings only show in Payouts tab, not Earnings tab
     const data = await api.get<CommissionDetailResponse[]>('/api/v1/affiliate/commissions?limit=100');
-    return (data || []).map(c => {
-      const toNumber = (v: number | string | undefined | null): number => {
-        if (v === undefined || v === null) return 0;
-        if (typeof v === 'number') return v;
-        const parsed = parseFloat(v);
-        return isNaN(parsed) ? 0 : parsed;
-      };
-      return {
-        id: String(c.id),
-        user_id: String(c.affiliate_user_id),
-        referral_user_id: c.referred_user_email || '', // email shown; backend lacks direct user id reference here
-        order_id: c.order_id ? String(c.order_id) : '',
-        level: (c.level === 1 || c.level === 2 || c.level === 3 ? c.level : 1),
-        commission_percentage: toNumber(c.commission_rate),
-        order_amount: toNumber(c.order_amount),
-        commission_amount: toNumber(c.commission_amount),
-        is_recurring: false, // backend does not expose recurring flag yet
-        created_at: c.created_at,
-        referral_user: undefined,
-        order: undefined,
-      } as ReferralEarning;
-    });
+    return (data || [])
+      .filter(c => c.status !== 'paid') // Filter out paid earnings on frontend as well
+      .map(c => {
+        const toNumber = (v: number | string | undefined | null): number => {
+          if (v === undefined || v === null) return 0;
+          if (typeof v === 'number') return v;
+          const parsed = parseFloat(v);
+          return isNaN(parsed) ? 0 : parsed;
+        };
+        return {
+          id: String(c.id),
+          user_id: String(c.affiliate_user_id),
+          referral_user_id: c.referred_user_email || '', // email shown; backend lacks direct user id reference here
+          order_id: c.order_id ? String(c.order_id) : '',
+          level: (c.level === 1 || c.level === 2 || c.level === 3 ? c.level : 1),
+          commission_percentage: toNumber(c.commission_rate),
+          order_amount: toNumber(c.order_amount),
+          commission_amount: toNumber(c.commission_amount),
+          is_recurring: false, // backend does not expose recurring flag yet
+          created_at: c.created_at,
+          referral_user: undefined,
+          order: undefined,
+        } as ReferralEarning;
+      });
   } catch (error) {
     if (error instanceof Error && error.message.startsWith('BACKEND_OFFLINE')) {
       throw error;
@@ -175,15 +184,25 @@ export const getReferralPayouts = async (): Promise<ReferralPayout[]> => {
       }
     };
     return (data || []).map(p => {
-      const amountNum = typeof p.amount === 'number' ? p.amount : parseFloat(String(p.amount));
+      const toNumber = (v: number | string | undefined | null): number => {
+        if (v === undefined || v === null) return 0;
+        if (typeof v === 'number') return v;
+        const parsed = parseFloat(String(v));
+        return isNaN(parsed) ? 0 : parsed;
+      };
+
+      const grossAmount = toNumber(p.gross_amount || p.amount);
+      const tdsAmount = toNumber(p.tds_amount);
+      const netAmount = toNumber(p.net_amount || p.amount);
+
       return {
         id: String(p.id),
         user_id: String(p.affiliate_user_id),
         payout_number: `PAYOUT-${p.id}`,
-        gross_amount: amountNum,
-        tds_amount: 0, // backend does not provide tax breakdown yet
-        service_tax_amount: 0,
-        net_amount: amountNum, // assume gross==net without tax components
+        gross_amount: grossAmount,
+        tds_amount: tdsAmount,
+        service_tax_amount: 0, // GST not applicable for commission income
+        net_amount: netAmount,
         status: mapStatus(p.status),
         payment_method: (p.payment_method as PaymentMethod) || 'bank_transfer',
         requested_at: p.requested_at,
