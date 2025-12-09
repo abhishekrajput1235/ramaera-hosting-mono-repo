@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Request, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from app.core.database import get_db
 from app.core.security import get_current_user
@@ -34,6 +34,17 @@ async def get_razorpay_key():
 # --------------------------------------------------------
 # Request/Response Schemas
 # --------------------------------------------------------
+class AddonSelection(BaseModel):
+    """Selected addon with pricing snapshot"""
+    addon_id: int
+    addon_slug: str
+    addon_name: str
+    quantity: int
+    unit_price: float
+    subtotal: float
+    unit_label: str
+
+
 class CreatePaymentRequest(BaseModel):
     """
     Unified payment creation request for subscription, server, and invoice payments
@@ -44,6 +55,14 @@ class CreatePaymentRequest(BaseModel):
     server_config: Optional[Dict[str, Any]] = None  # For server purchase
     amount: Optional[float] = None  # Required for invoice payment
     invoice_id: Optional[int] = None  # For invoice payment tracking
+    
+    # Addons
+    addons: Optional[List[AddonSelection]] = []  # Selected addons with pricing
+    
+    # Promo code & discounts
+    promo_code: Optional[str] = None  # Promo code applied (e.g., "WELCOME10")
+    discount_amount: Optional[float] = None  # Promo discount amount
+    tax_amount: Optional[float] = None  # Tax amount calculated on frontend
 
 
 class VerifyPaymentRequest(BaseModel):
@@ -139,11 +158,16 @@ async def create_payment_order(
 
         metadata = {
             'plan_id': payment_request.plan_id,
+            'billing_cycle': payment_request.billing_cycle,  # 🆕 Store billing cycle in metadata
             'server_config': payment_request.server_config,
             'plan_name': plan.name,
             'has_premium_subscription': has_premium,
             'enable_commission': True,  # Commission enabled for all server purchases (referrer check happens later)
-            'skip_backend_calculation': skip_backend_calculation  # Flag to skip tax/discount recalc
+            'skip_backend_calculation': skip_backend_calculation,  # Flag to skip tax/discount recalc
+            'addons': [addon.dict() for addon in payment_request.addons] if payment_request.addons else [],  # Structured addon data
+            'promo_code': payment_request.promo_code,  # Promo code applied
+            'discount_amount': payment_request.discount_amount,  # Promo discount amount
+            'tax_amount': payment_request.tax_amount  # Tax amount from frontend
         }
 
     try:
@@ -415,9 +439,21 @@ async def verify_payment(
             from app.schemas.order import OrderCreate
 
             t2 = time.time()
+            # Get billing cycle from payment transaction (priority: direct column > metadata > error)
+            billing_cycle = payment_transaction.billing_cycle
+            if not billing_cycle:
+                # Fallback to metadata if column is empty
+                billing_cycle = payment_transaction.payment_metadata.get('billing_cycle')
+                if not billing_cycle:
+                    # This should not happen, but default to monthly as last resort
+                    print(f"⚠️  WARNING: No billing_cycle found for payment {payment_transaction.id}, defaulting to monthly")
+                    billing_cycle = 'monthly'
+            
+            print(f"✅ Using billing_cycle: {billing_cycle} for order creation")
+            
             order_create = OrderCreate(
                 plan_id=plan_id,
-                billing_cycle=payment_transaction.payment_metadata.get('billing_cycle', 'one_time'),
+                billing_cycle=billing_cycle,
                 total_amount=payment_transaction.total_amount,
                 status='active',
                 payment_method='razorpay',
@@ -458,6 +494,90 @@ async def verify_payment(
                 order_obj.paid_at = payment_transaction.paid_at
                 order_obj.order_status = 'completed'
                 order_obj.payment_status = 'paid'
+                
+                # Save promo code and discount/tax from payment metadata
+                payment_metadata = payment_transaction.payment_metadata or {}
+                order_obj.promo_code = payment_metadata.get('promo_code')
+                if payment_metadata.get('discount_amount') is not None:
+                    order_obj.discount_amount = Decimal(str(payment_metadata.get('discount_amount')))
+                if payment_metadata.get('tax_amount') is not None:
+                    order_obj.tax_amount = Decimal(str(payment_metadata.get('tax_amount')))
+                
+                # 🆕 Ensure service dates are set (if not already set during order creation)
+                if not order_obj.service_start_date or not order_obj.service_end_date:
+                    # Use payment time as service start
+                    service_start = payment_transaction.paid_at or datetime.utcnow()
+                    
+                    # Calculate end date based on billing cycle
+                    billing_cycle = order_obj.billing_cycle or 'monthly'
+                    cycle_days = {
+                        'monthly': 30,
+                        'quarterly': 90,
+                        'semi_annual': 180,
+                        'semi-annually': 180,
+                        'annual': 365,
+                        'annually': 365,
+                        'biennial': 730,
+                        'biennially': 730,
+                        'triennial': 1095,
+                        'triennially': 1095,
+                        'one_time': 30
+                    }
+                    days = cycle_days.get(billing_cycle.lower(), 30)
+                    service_end = service_start + timedelta(days=days)
+                    
+                    order_obj.service_start_date = service_start
+                    order_obj.service_end_date = service_end
+                    
+                    print(f"✅ Service dates set: {service_start.date()} to {service_end.date()} ({billing_cycle})")
+                
+                
+                # Create order_addons records from payment metadata
+                selected_addons = payment_metadata.get('addons', [])
+                if selected_addons:
+                    from app.models.order_addon import OrderAddon
+                    
+                    for addon_data in selected_addons:
+                        # Skip addons with addon_id = 0 (hardcoded/temporary addons)
+                        if addon_data.get('addon_id', 0) == 0:
+                            continue
+                        
+                        try:
+                            # Calculate tax for this addon
+                            subtotal = Decimal(str(addon_data.get('subtotal', 0)))
+                            tax_rate = Decimal('0.18')  # 18% GST
+                            tax_amount = subtotal * tax_rate
+                            total_amount = subtotal + tax_amount
+                            
+                            # Create order_addon record with snapshot
+                            order_addon = OrderAddon(
+                                order_id=order_obj.id,
+                                addon_id=addon_data.get('addon_id'),
+                                addon_name=addon_data.get('addon_name', ''),
+                                addon_category=addon_data.get('category', 'GENERAL'),
+                                addon_description=addon_data.get('description', ''),
+                                quantity=addon_data.get('quantity', 1),
+                                unit_price=Decimal(str(addon_data.get('unit_price', 0))),
+                                subtotal=subtotal,
+                                discount_percent=Decimal('0'),
+                                discount_amount=Decimal('0'),
+                                tax_percent=tax_rate * 100,  # Store as percentage
+                                tax_amount=tax_amount,
+                                total_amount=total_amount,
+                                billing_type='monthly',  # Default
+                                currency='INR',
+                                unit_label=addon_data.get('unit_label', ''),
+                                is_active=1
+                            )
+                            db.add(order_addon)
+                            
+                        except Exception as addon_error:
+                            print(f"Warning: Failed to create order_addon for {addon_data.get('addon_name')}: {str(addon_error)}")
+                            # Continue processing other addons
+                    
+                    # Commit addon records
+                    await db.flush()
+
 
                 # Update associated invoice
                 invoice_result = await db.execute(
@@ -516,17 +636,25 @@ async def verify_payment(
                         storage_gb=plan.storage_gb,
                         bandwidth_gb=plan.bandwidth_gb or 1000,
                         plan_id=plan.id,
-                        monthly_cost=plan.base_price
+                        monthly_cost=plan.base_price,
+                        billing_cycle=order_obj.billing_cycle  # 🆕 Pass billing cycle from order
                     )
 
-                    # Create server with order_id to link them
+                    # 🆕 Use order service dates for server if available
+                    server_created_date = order_obj.service_start_date or datetime.utcnow()
+                    server_expiry_date = order_obj.service_end_date
+
+                    # Create server with order_id and dates to link them
                     created_server = await server_service.create_user_server(
                         db,
                         current_user.id,
                         server_data,
-                        order_id=order_obj.id
+                        order_id=order_obj.id,
+                        created_date=server_created_date,  # 🆕 Pass order start date
+                        expiry_date=server_expiry_date  # 🆕 Pass order end date
                     )
                     print(f"✅ Server created: {created_server.id} for order {order_obj.id}")
+                    print(f"🗓️ Server dates: {server_created_date.date()} to {server_expiry_date.date() if server_expiry_date else 'N/A'}")
                     server_created = created_server # Assign to server_created for response
                     print(f"⏱️  Server creation took {time.time() - t5:.2f}s")
             except Exception as e:

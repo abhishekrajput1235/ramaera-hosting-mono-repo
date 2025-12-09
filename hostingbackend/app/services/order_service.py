@@ -21,6 +21,43 @@ from app.services.referral_service import ReferralService
 
 class OrderService:
     # -----------------------------
+    # 🔹 HELPER METHOD: Calculate service period dates
+    # -----------------------------
+    def _calculate_service_dates(self, billing_cycle: str, start_date: Optional[datetime] = None) -> tuple[datetime, datetime]:
+        """
+        Calculate service start and end dates based on billing cycle.
+        
+        Args:
+            billing_cycle: Billing cycle (monthly, quarterly, annually, etc.)
+            start_date: Optional start date (defaults to current UTC time)
+            
+        Returns:
+            Tuple of (service_start_date, service_end_date)
+        """
+        if not start_date:
+            start_date = datetime.utcnow()
+        
+        # Billing cycle to days mapping
+        cycle_days = {
+            'monthly': 30,
+            'quarterly': 90,
+            'semi_annual': 180,
+            'semi-annually': 180,
+            'annual': 365,
+            'annually': 365,
+            'biennial': 730,
+            'biennially': 730,
+            'triennial': 1095,
+            'triennially': 1095,
+            'one_time': 30  # Default to 30 days for one-time purchases
+        }
+        
+        days = cycle_days.get(billing_cycle.lower(), 30)  # Default to 30 days
+        end_date = start_date + timedelta(days=days)
+        
+        return start_date, end_date
+    
+    # -----------------------------
     # 🔹 USER-SPECIFIC QUERIES
     # -----------------------------
     async def get_user_orders(
@@ -255,6 +292,14 @@ class OrderService:
             # Grand total for customer invoice
             grand_total = total_discounted + gst_amount
 
+            # ✅ 7️⃣.5️⃣ Calculate service period dates
+            # Use dates from order_data if provided, otherwise calculate from billing cycle
+            if order_data.service_start_date and order_data.service_end_date:
+                service_start_date = order_data.service_start_date
+                service_end_date = order_data.service_end_date
+            else:
+                service_start_date, service_end_date = self._calculate_service_dates(order_data.billing_cycle)
+
             # ✅ 8️⃣ Create Order
             new_order = Order(
                 user_id=user_id,
@@ -269,6 +314,8 @@ class OrderService:
                 order_status="pending",
                 payment_status="pending",
                 currency="INR",
+                service_start_date=service_start_date,  # 🆕 Set service start date
+                service_end_date=service_end_date,  # 🆕 Set service end date
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )

@@ -59,6 +59,9 @@ class PaymentTransaction(Base):
     
     # Additional payment metadata from Razorpay
     payment_metadata = Column(JSON, nullable=True)  # Store additional Razorpay response data
+    
+    # Billing Cycle - Store directly for reliability
+    billing_cycle = Column(String(50), nullable=True, default='monthly')  # monthly, quarterly, semi_annual, annual, biennial, triennial
 
     # Payment Status
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.INITIATED, nullable=False, index=True)

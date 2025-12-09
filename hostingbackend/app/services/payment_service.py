@@ -102,6 +102,7 @@ class PaymentService:
             tax_amount=tax_amount,
             total_amount=total_amount,
             currency='INR',
+            billing_cycle=billing_cycle,  # 🆕 Store billing cycle directly
             razorpay_order_id=razorpay_order['id'],
             payment_status=PaymentStatus.INITIATED,
             payment_metadata=metadata

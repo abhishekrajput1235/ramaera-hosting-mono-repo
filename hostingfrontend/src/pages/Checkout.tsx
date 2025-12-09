@@ -422,9 +422,10 @@ export function Checkout() {
       addOnsCost += additionalIPv4 * ipv4Price;
     }
 
-    // Old backup service (keeping for backwards compatibility)
+    // Old backup service (legacy - keeping for backwards compatibility)
     if (backupService) {
-      addOnsCost += 500;
+      const backupAddon = getAddonBySlug('backup-service-basic');
+      addOnsCost += backupAddon?.price || 500;
     }
 
     // Managed server (self, basic, premium)
@@ -458,43 +459,261 @@ export function Checkout() {
       addOnsCost += pleskHostAddon?.price || 2650; // Unlimited domains
     }
 
-    // Backup storage
+
+    // Backup storage - Get prices from backend
     if (backupStorage === '100gb') {
-      addOnsCost += 750;
+      const addon = getAddonBySlug('backup-storage-100gb');
+      addOnsCost += addon?.price || 750;
     } else if (backupStorage === '200gb') {
-      addOnsCost += 1500;
+      const addon = getAddonBySlug('backup-storage-200gb');
+      addOnsCost += addon?.price || 1500;
     } else if (backupStorage === '300gb') {
-      addOnsCost += 2250;
+      const addon = getAddonBySlug('backup-storage-300gb');
+      addOnsCost += addon?.price || 2250;
     } else if (backupStorage === '500gb') {
-      addOnsCost += 3750;
+      const addon = getAddonBySlug('backup-storage-500gb');
+      addOnsCost += addon?.price || 3750;
     } else if (backupStorage === '1000gb') {
-      addOnsCost += 7500;
+      const addon = getAddonBySlug('backup-storage-1000gb');
+      addOnsCost += addon?.price || 7500;
     }
 
-    // SSL certificates (annual, so divide by 12 for monthly)
+    // SSL certificates - Get prices from backend
     if (sslCertificate === 'essential') {
-      addOnsCost += Math.round(2700 / 12); // ₹225/month
+      const addon = getAddonBySlug('ssl-essential');
+      addOnsCost += addon?.price || 225;
     } else if (sslCertificate === 'essential-wildcard') {
-      addOnsCost += Math.round(13945.61 / 12); // ₹1162/month
+      const addon = getAddonBySlug('ssl-essential-wildcard');
+      addOnsCost += addon?.price || 1162;
     } else if (sslCertificate === 'comodo') {
-      addOnsCost += Math.round(2500 / 12); // ₹208/month
+      const addon = getAddonBySlug('ssl-comodo');
+      addOnsCost += addon?.price || 208;
     } else if (sslCertificate === 'comodo-wildcard') {
-      addOnsCost += Math.round(13005.86 / 12); // ₹1084/month
+      const addon = getAddonBySlug('ssl-comodo-wildcard');
+      addOnsCost += addon?.price || 1084;
     } else if (sslCertificate === 'rapid') {
-      addOnsCost += Math.round(3000 / 12); // ₹250/month
+      const addon = getAddonBySlug('ssl-rapid');
+      addOnsCost += addon?.price || 250;
     } else if (sslCertificate === 'rapid-wildcard') {
-      addOnsCost += Math.round(16452.72 / 12); // ₹1371/month
+      const addon = getAddonBySlug('ssl-rapid-wildcard');
+      addOnsCost += addon?.price || 1371;
     }
 
-    // Support packages
+    // Support packages - Get prices from backend
     if (supportPackage === 'basic') {
-      addOnsCost += 2500;
+      const addon = getAddonBySlug('support-basic');
+      addOnsCost += addon?.price || 2500;
     } else if (supportPackage === 'premium') {
-      addOnsCost += 7500;
+      const addon = getAddonBySlug('support-premium');
+      addOnsCost += addon?.price || 7500;
     }
 
     return addOnsCost;
   };
+
+  // Calculate selected addons with structured data for backend
+  const calculateSelectedAddons = () => {
+    const selectedAddons = [];
+
+    // Extra Storage
+    if (extraStorage > 0) {
+      const addon = getAddonBySlug('extra-storage');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: extraStorage,
+          unit_price: addon.price,
+          subtotal: extraStorage * addon.price,
+          unit_label: addon.unit_label || 'GB'
+        });
+      }
+    }
+
+    // Extra Bandwidth
+    if (extraBandwidth > 0) {
+      const addon = getAddonBySlug('extra-bandwidth');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: extraBandwidth,
+          unit_price: addon.price,
+          subtotal: extraBandwidth * addon.price,
+          unit_label: addon.unit_label || 'TB'
+        });
+      }
+    }
+
+    // Additional IPv4
+    if (additionalIPv4 > 0) {
+      const addon = getAddonBySlug('additional-ipv4');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: additionalIPv4,
+          unit_price: addon.price,
+          subtotal: additionalIPv4 * addon.price,
+          unit_label: addon.unit_label || 'IP'
+        });
+      }
+    }
+
+    // Managed Service
+    if (managedService === 'basic') {
+      const addon = getAddonBySlug('managed-basic');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: 'service'
+        });
+      }
+    } else if (managedService === 'premium') {
+      const addon = getAddonBySlug('managed-premium');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: 'service'
+        });
+      }
+    }
+
+    // DDoS Protection
+    if (ddosProtection === 'advanced') {
+      const addon = getAddonBySlug('ddos-advanced');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: 'service'
+        });
+      }
+    } else if (ddosProtection === 'enterprise') {
+      const addon = getAddonBySlug('ddos-enterprise');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: 'service'
+        });
+      }
+    }
+
+    // Plesk Addons
+    if (pleskAddon === 'admin') {
+      const addon = getAddonBySlug('plesk-admin');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: 'license'
+        });
+      }
+    } else if (pleskAddon === 'pro') {
+      const addon = getAddonBySlug('plesk-pro');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: 'license'
+        });
+      }
+    } else if (pleskAddon === 'host') {
+      const addon = getAddonBySlug('plesk-host');
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: 'license'
+        });
+      }
+    }
+
+    // Backup Storage - Get addon from backend
+    if (backupStorage && backupStorage !== 'none') {
+      const addon = getAddonBySlug(`backup-storage-${backupStorage}`);
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: addon.unit_label || 'storage'
+        });
+      }
+    }
+
+    // SSL Certificate - Get addon from backend
+    if (sslCertificate && sslCertificate !== 'none') {
+      const addon = getAddonBySlug(`ssl-${sslCertificate}`);
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: addon.unit_label || 'certificate'
+        });
+      }
+    }
+
+    // Support Package - Get addon from backend
+    if (supportPackage && supportPackage !== 'none') {
+      const addon = getAddonBySlug(`support-${supportPackage}`);
+      if (addon) {
+        selectedAddons.push({
+          addon_id: addon.id,
+          addon_slug: addon.slug,
+          addon_name: addon.name,
+          quantity: 1,
+          unit_price: addon.price,
+          subtotal: addon.price,
+          unit_label: addon.unit_label || 'service'
+        });
+      }
+    }
+
+    return selectedAddons;
+  };
+
 
   // Calculate subtotal including add-ons and quantity
   const billingCycleInfo = useMemo(() => ({
@@ -648,29 +867,37 @@ export function Checkout() {
         payment_type: 'server',
         plan_id: serverConfig.planId,
         amount: pricingQuote?.quote?.total || calculateTotal(), // Prefer backend quote total
-        billing_cycle: serverConfig.billingCycle === 'monthly' ? 'monthly' :
-          serverConfig.billingCycle === 'quarterly' ? 'quarterly' :
-            serverConfig.billingCycle === 'semiannually' ? 'semi_annual' :
-              serverConfig.billingCycle === 'annually' ? 'annual' :
-                serverConfig.billingCycle === 'biennially' ? 'biennial' :
-                  serverConfig.billingCycle === 'triennially' ? 'triennial' : 'monthly',
+        billing_cycle: (() => {
+          // Map frontend billing cycle to backend format
+          const cycleMap: Record<string, string> = {
+            'monthly': 'monthly',
+            'quarterly': 'quarterly',
+            'semiannually': 'semi_annual',
+            'annually': 'annual',
+            'biennially': 'biennial',
+            'triennially': 'triennial'
+          };
+          const mappedCycle = cycleMap[serverConfig.billingCycle];
+          if (!mappedCycle) {
+            console.error('❌ Invalid billing cycle:', serverConfig.billingCycle);
+            throw new Error(`Invalid billing cycle: ${serverConfig.billingCycle}`);
+          }
+          console.log(`✅ Billing cycle mapped: ${serverConfig.billingCycle} → ${mappedCycle}`);
+          return mappedCycle;
+        })(),
         server_config: {
           server_name: hostname || `${serverConfig.planName} Server`,
           hostname: hostname || `server-${Date.now()}.bidua.com`,
           os: operatingSystem || 'Ubuntu 22.04 LTS',
           datacenter: datacenter || 'noida-india',
-          managed_service: managedService,
-          ddos_protection: ddosProtection,
-          additional_ipv4: additionalIPv4,
-          backup_service: backupService,
-          plesk_addon: pleskAddon,
-          backup_storage: backupStorage,
-          ssl_certificate: sslCertificate,
-          support_package: supportPackage,
-          extra_storage: extraStorage,
-          extra_bandwidth: extraBandwidth,
           quantity: serverQuantity
-        }
+        },
+        // Structured addon data
+        addons: calculateSelectedAddons(),
+        // Promo code & discounts
+        promo_code: promoCode || null,
+        discount_amount: promoDiscount || 0,
+        tax_amount: calculateTax() || 0
       });
 
       if (!paymentOrderResponse.success) {
@@ -895,8 +1122,8 @@ export function Checkout() {
               <div key={step.number} className="flex items-center">
                 <div className={`flex flex-col items-center ${index > 0 ? 'ml-4 lg:ml-8' : ''}`}>
                   <div className={`w-10 h-10 lg:w-12 lg:h-12 rounded-full flex items-center justify-center border-2 transition-all touch-manipulation ${currentStep >= step.number
-                      ? 'bg-cyan-600 border-cyan-600 text-white'
-                      : 'bg-slate-800 border-slate-700 text-slate-500'
+                    ? 'bg-cyan-600 border-cyan-600 text-white'
+                    : 'bg-slate-800 border-slate-700 text-slate-500'
                     }`}>
                     {currentStep > step.number ? (
                       <Check className="h-4 w-4 lg:h-6 lg:w-6" />
@@ -1886,8 +2113,8 @@ export function Checkout() {
                         <div>
                           <p className="text-xs uppercase text-slate-400">Status</p>
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-semibold ${(orderDetails?.payment?.status || orderDetails?.status) === 'paid' || (orderDetails?.payment?.status || orderDetails?.status) === 'authorized'
-                              ? 'bg-green-500/20 text-green-200'
-                              : 'bg-amber-500/20 text-amber-200'
+                            ? 'bg-green-500/20 text-green-200'
+                            : 'bg-amber-500/20 text-amber-200'
                             }`}>
                             {orderDetails?.payment?.status || orderDetails?.status || 'Pending'}
                           </span>
@@ -1967,6 +2194,19 @@ export function Checkout() {
                         <span>Sub Total</span>
                         <span className="text-white font-semibold">{formatCurrency(subtotal)}</span>
                       </div>
+                      {billingCycleInfo.discount > 0 && (() => {
+                        // Calculate plan discount for display
+                        const baseMonthlyWithoutDiscount = serverConfig.monthlyPrice / (1 - billingCycleInfo.discount / 100);
+                        const baseTotal = (baseMonthlyWithoutDiscount + calculateAddOnsCost()) * billingCycleInfo.months * serverQuantity;
+                        const planDiscountAmount = Math.round(baseTotal * (billingCycleInfo.discount / 100));
+
+                        return (
+                          <div className="flex items-center justify-between text-emerald-400">
+                            <span>Plan Discount ({billingCycleInfo.discount}%)</span>
+                            <span className="font-semibold">-{formatCurrency(planDiscountAmount)}</span>
+                          </div>
+                        );
+                      })()}
                       {promoDiscount > 0 && (
                         <div className="flex items-center justify-between text-slate-300">
                           <span>Promotional Discount</span>
@@ -2246,12 +2486,32 @@ export function Checkout() {
                   </div>
                 )}
 
-                {isBillingCountryIndia && (
-                  <div className="flex justify-between text-sm text-slate-400 mb-2">
-                    <span>IGST @ 18.00%:</span>
-                    <span className="text-white">{formatCurrency(calculateTax())}</span>
-                  </div>
-                )}
+                {isBillingCountryIndia && (() => {
+                  const { cgst, sgst, igst } = getTaxBreakdown();
+
+                  return (
+                    <>
+                      {cgst > 0 && (
+                        <div className="flex justify-between text-sm text-slate-400 mb-2">
+                          <span>CGST @ 9.00%:</span>
+                          <span className="text-white">{formatCurrency(cgst)}</span>
+                        </div>
+                      )}
+                      {sgst > 0 && (
+                        <div className="flex justify-between text-sm text-slate-400 mb-2">
+                          <span>SGST @ 9.00%:</span>
+                          <span className="text-white">{formatCurrency(sgst)}</span>
+                        </div>
+                      )}
+                      {igst > 0 && (
+                        <div className="flex justify-between text-sm text-slate-400 mb-2">
+                          <span>IGST @ 18.00%:</span>
+                          <span className="text-white">{formatCurrency(igst)}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Total */}
@@ -2586,6 +2846,19 @@ export function Checkout() {
                   <span className="text-white font-semibold">{formatCurrency(calculateSubtotal())}</span>
                 </div>
 
+                {billingCycleInfo.discount > 0 && (() => {
+                  const baseMonthlyWithoutDiscount = serverConfig.monthlyPrice / (1 - billingCycleInfo.discount / 100);
+                  const baseTotal = (baseMonthlyWithoutDiscount + calculateAddOnsCost()) * billingCycleInfo.months * serverQuantity;
+                  const planDiscountAmount = Math.round(baseTotal * (billingCycleInfo.discount / 100));
+
+                  return (
+                    <div className="flex justify-between text-sm text-emerald-400 mb-2">
+                      <span>Plan Discount ({billingCycleInfo.discount}%):</span>
+                      <span>-{formatCurrency(planDiscountAmount)}</span>
+                    </div>
+                  );
+                })()}
+
                 {promoDiscount > 0 && (
                   <div className="flex justify-between text-sm text-green-400 mb-2">
                     <span>Promo Discount:</span>
@@ -2593,12 +2866,32 @@ export function Checkout() {
                   </div>
                 )}
 
-                {isBillingCountryIndia && (
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-slate-400">IGST @ 18.00%:</span>
-                    <span className="text-white">{formatCurrency(calculateTax())}</span>
-                  </div>
-                )}
+                {isBillingCountryIndia && (() => {
+                  const { cgst, sgst, igst } = getTaxBreakdown();
+
+                  return (
+                    <>
+                      {cgst > 0 && (
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-slate-400">CGST @ 9.00%:</span>
+                          <span className="text-white">{formatCurrency(cgst)}</span>
+                        </div>
+                      )}
+                      {sgst > 0 && (
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-slate-400">SGST @ 9.00%:</span>
+                          <span className="text-white">{formatCurrency(sgst)}</span>
+                        </div>
+                      )}
+                      {igst > 0 && (
+                        <div className="flex justify-between text-sm mb-2">
+                          <span className="text-slate-400">IGST @ 18.00%:</span>
+                          <span className="text-white">{formatCurrency(igst)}</span>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
               </div>
 
               {/* Total with highlight */}

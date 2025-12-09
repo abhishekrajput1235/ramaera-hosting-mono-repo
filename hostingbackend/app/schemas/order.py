@@ -336,6 +336,9 @@ class OrderCreate(OrderBase):
     addon_ids: Optional[List[int]] = []  # List of addon IDs to attach to order
     service_ids: Optional[List[int]] = []  # List of service IDs to attach to order
     server_details: Optional[Dict[str, Any]] = None  # Kept for backward compatibility
+    # Service period dates (optional - will be auto-calculated if not provided)
+    service_start_date: Optional[datetime] = None
+    service_end_date: Optional[datetime] = None
 
     @validator('billing_cycle')
     def validate_billing_cycle(cls, v):

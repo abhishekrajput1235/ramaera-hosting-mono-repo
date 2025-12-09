@@ -235,7 +235,13 @@ class ServerService:
     # ✅ Create server
     # --------------------------------------------------------
     async def create_user_server(
-        self, db: AsyncSession, user_id: int, server_data: ServerCreate, order_id: Optional[int] = None
+        self, 
+        db: AsyncSession, 
+        user_id: int, 
+        server_data: ServerCreate, 
+        order_id: Optional[int] = None,
+        created_date: Optional[datetime] = None,  # 🆕 Accept custom created date
+        expiry_date: Optional[datetime] = None  # 🆕 Accept custom expiry date
     ) -> Server:
         # Fetch plan details
         result = await db.execute(
@@ -245,18 +251,31 @@ class ServerService:
         if not plan:
             raise ValueError("Hosting plan not found")
 
-        # Calculate expiry date based on billing cycle
-        billing_cycle_days = {
-            "monthly": 30,
-            "quarterly": 90,
-            "semiannually": 180,
-            "annually": 365,
-            "biennially": 730,
-            "triennially": 1095
-        }
-        cycle = (server_data.billing_cycle or "monthly").lower()
-        days = billing_cycle_days.get(cycle, 30)
-        expiry_date = datetime.now() + timedelta(days=days)
+        # Calculate expiry date based on billing cycle or use provided dates
+        if not created_date:
+            created_date = datetime.now()
+            
+        if not expiry_date:
+            # Calculate expiry date based on billing cycle
+            billing_cycle_days = {
+                "monthly": 30,
+                "quarterly": 90,
+                "semiannually": 180,
+                "semi_annual": 180,
+                "annually": 365,
+                "annual": 365,
+                "biennially": 730,
+                "biennial": 730,
+                "triennially": 1095,
+                "triennial": 1095,
+                "one_time": 30
+            }
+            cycle = (server_data.billing_cycle or "monthly").lower()
+            days = billing_cycle_days.get(cycle, 30)
+            expiry_date = created_date + timedelta(days=days)
+            print(f"🗓️ Calculated expiry: {days} days from {created_date.date()} = {expiry_date.date()}")
+        else:
+            print(f"🗓️ Using provided dates: {created_date.date()} to {expiry_date.date()}")
 
         # Build specs with addons and services
         specs_data = {
@@ -271,7 +290,7 @@ class ServerService:
 
         db_server = Server(
             user_id=user_id,
-            order_id=order_id,  # 🔹 NEW: Link to order
+            order_id=order_id,  # 🔹 Link to order
             server_name=server_data.server_name,
             hostname=server_data.hostname,
             server_type=server_data.server_type,
@@ -284,7 +303,8 @@ class ServerService:
             plan_name=plan.name,
             monthly_cost=server_data.monthly_cost,
             billing_cycle=server_data.billing_cycle or "monthly",
-            expiry_date=expiry_date,
+            created_date=created_date,  # 🆕 Use provided or current date
+            expiry_date=expiry_date,  # 🆕 Use provided or calculated date
             specs=specs_data,
             server_status="active",  # Set to active immediately after provisioning
         )
