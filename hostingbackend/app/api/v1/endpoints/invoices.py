@@ -285,11 +285,44 @@ async def get_invoice(
     current_user: User = Depends(get_current_user),
     invoice_service: InvoiceService = Depends()
 ):
-    """Get invoice by ID"""
+    """Get invoice by ID with transaction history"""
+    from app.models.payment import PaymentTransaction
+    
     invoice = await invoice_service.get_user_invoice(db, current_user.id, invoice_id)
     if not invoice:
         raise HTTPException(status_code=404, detail="Invoice not found")
-    return invoice
+    
+    # Query payment transaction for this invoice
+    try:
+        stmt = select(PaymentTransaction).where(
+            PaymentTransaction.invoice_id == invoice_id,
+            PaymentTransaction.payment_status == "completed"
+        )
+        result = await db.execute(stmt)
+        payment_transaction = result.scalar_one_or_none()
+        
+        # Convert invoice to dict and add transaction data
+        invoice_dict = invoice.dict() if hasattr(invoice, 'dict') else invoice.__dict__
+        
+        if payment_transaction:
+            invoice_dict["transaction"] = {
+                "payment_id": payment_transaction.razorpay_payment_id or "",
+                "transaction_date": payment_transaction.paid_at.isoformat() if payment_transaction.paid_at else "",
+                "gateway": "Razorpay",
+                "amount": float(payment_transaction.total_amount or 0),
+                "transaction_id": payment_transaction.id,
+                "payment_method": payment_transaction.payment_method or "razorpay"
+            }
+            logger.info(f"Added transaction data to invoice {invoice_id}")
+        else:
+            invoice_dict["transaction"] = None
+            logger.info(f"No transaction found for invoice {invoice_id}")
+        
+        return invoice_dict
+    except Exception as e:
+        logger.error(f"Error fetching transaction for invoice {invoice_id}: {str(e)}")
+        # Return invoice without transaction data if query fails
+        return invoice
 
 
 @router.get("/{invoice_id}/download")

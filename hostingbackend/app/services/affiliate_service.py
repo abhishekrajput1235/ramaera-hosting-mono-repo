@@ -898,7 +898,11 @@ class AffiliateService:
         pending_payouts_amount = pending_payouts_result.scalar() or Decimal('0')
 
         # Available balance = approved - (completed payouts + pending payouts)
-        stats.available_balance = stats.approved_commission - stats.total_payout_amount - pending_payouts_amount
+        # ALWAYS ensure balance is never negative
+        stats.available_balance = max(
+            Decimal('0'),
+            stats.approved_commission - stats.total_payout_amount - pending_payouts_amount
+        )
 
         await db.commit()
 

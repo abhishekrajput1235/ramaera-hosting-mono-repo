@@ -124,6 +124,12 @@ export function ReferralsEnhanced() {
   const [earnings, setEarnings] = useState<UIReferralEarning[]>([]);
   const [payouts, setPayouts] = useState<UIReferralPayout[]>([]);
 
+  // Pagination state
+  const [teamPage, setTeamPage] = useState(1);
+  const [commissionsPage, setCommissionsPage] = useState(1);
+  const [payoutsPage, setPayoutsPage] = useState(1);
+  const ITEMS_PER_PAGE = 5;
+
   useEffect(() => {
     loadData();
 
@@ -485,6 +491,53 @@ export function ReferralsEnhanced() {
 
   const filterTeamByLevel = (level: number | null) => {
     setSelectedLevel(level);
+    setTeamPage(1); // Reset to first page when filter changes
+  };
+
+  // Pagination helper functions
+  const getPaginatedData = <T,>(data: T[], currentPage: number, itemsPerPage: number): T[] => {
+    const startIdx = (currentPage - 1) * itemsPerPage;
+    const endIdx = startIdx + itemsPerPage;
+    return data.slice(startIdx, endIdx);
+  };
+
+  const getTotalPages = (totalItems: number, itemsPerPage: number): number => {
+    return Math.ceil(totalItems / itemsPerPage);
+  };
+
+  // Pagination Controls Component
+  const PaginationControls = ({
+    currentPage,
+    totalPages,
+    onPageChange
+  }: {
+    currentPage: number;
+    totalPages: number;
+    onPageChange: (page: number) => void;
+  }) => {
+    if (totalPages <= 1) return null;
+
+    return (
+      <div className="flex items-center justify-between px-4 py-3 border-t border-slate-700 bg-slate-900/50">
+        <button
+          onClick={() => onPageChange(currentPage - 1)}
+          disabled={currentPage === 1}
+          className="px-4 py-2 bg-cyan-600 text-white text-sm font-semibold rounded-lg hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+        >
+          Previous
+        </button>
+        <span className="text-slate-300 text-sm font-medium">
+          Page {currentPage} of {totalPages}
+        </span>
+        <button
+          onClick={() => onPageChange(currentPage + 1)}
+          disabled={currentPage >= totalPages}
+          className="px-4 py-2 bg-cyan-600 text-white text-sm font-semibold rounded-lg hover:bg-cyan-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
+        >
+          Next
+        </button>
+      </div>
+    );
   };
 
   const filteredTeam = selectedLevel
@@ -544,7 +597,11 @@ export function ReferralsEnhanced() {
   const approvedAmount = stats?.approved_commission || 0;
   const paidAmount = stats?.paid_commission || stats?.total_payout_amount || 0;
   const calculatedAvailableBalance = approvedAmount - paidAmount;
-  const displayAvailableBalance = calculatedAvailableBalance > 0 ? calculatedAvailableBalance : (stats?.available_balance || 0);
+
+  // ALWAYS ensure balance is never negative
+  const displayAvailableBalance = Math.max(0,
+    calculatedAvailableBalance > 0 ? calculatedAvailableBalance : (stats?.available_balance || 0)
+  );
 
   // Debug logging
   console.log('Stats Debug:', {
@@ -704,10 +761,10 @@ export function ReferralsEnhanced() {
               ₹{displayAvailableBalance.toLocaleString()}
             </div>
             <div className="text-xs sm:text-sm text-slate-400 mb-2">Available Balance</div>
-            {displayAvailableBalance !== stats?.available_balance && (
-              <div className="text-xs text-yellow-400 mb-2">Calculated: ₹{calculatedAvailableBalance.toFixed(2)} (Backend: ₹{stats?.available_balance || 0})</div>
+            {displayAvailableBalance !== stats?.available_balance && calculatedAvailableBalance !== displayAvailableBalance && (
+              <div className="text-xs text-yellow-400 mb-2">Calculated: ₹{Math.max(0, calculatedAvailableBalance).toFixed(2)} (Backend: ₹{stats?.available_balance || 0})</div>
             )}
-            {stats?.can_request_payout && (
+            {displayAvailableBalance >= 500 && (
               <button
                 onClick={() => openPayoutModal(true)}
                 className="w-full px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded transition"
@@ -860,7 +917,7 @@ export function ReferralsEnhanced() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredTeam.map(member => (
+                      {getPaginatedData(filteredTeam, teamPage, ITEMS_PER_PAGE).map(member => (
                         <tr key={member.user_id} className="border-b border-slate-800 hover:bg-slate-800/50">
                           <td className="py-3 px-4">
                             <div>
@@ -895,6 +952,13 @@ export function ReferralsEnhanced() {
                       ))}
                     </tbody>
                   </table>
+                  {filteredTeam.length > ITEMS_PER_PAGE && (
+                    <PaginationControls
+                      currentPage={teamPage}
+                      totalPages={getTotalPages(filteredTeam.length, ITEMS_PER_PAGE)}
+                      onPageChange={setTeamPage}
+                    />
+                  )}
                 </div>
 
                 {filteredTeam.length === 0 && (
@@ -923,36 +987,48 @@ export function ReferralsEnhanced() {
                       </tr>
                     </thead>
                     <tbody className="bg-slate-950/60 divide-y divide-gray-700">
-                      {commissions
-                        .filter(comm => comm.status !== 'paid' && comm.status !== 'completed')
-                        .map(comm => (
-                          <tr key={comm.id}>
-                            <td className="px-4 py-3 text-sm text-white">
-                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${comm.level === 1 ? 'bg-green-100 text-green-800' :
-                                comm.level === 2 ? 'bg-blue-100 text-blue-800' :
-                                  'bg-purple-100 text-purple-800'
-                                }`}>
-                                L{comm.level}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-white">₹{comm.order_amount?.toFixed(2)}</td>
-                            <td className="px-4 py-3 text-sm text-white">{comm.commission_rate}%</td>
-                            <td className="px-4 py-3 text-sm font-bold text-green-600">₹{comm.commission_amount?.toFixed(2)}</td>
-                            <td className="px-4 py-3 text-sm">
-                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${comm.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                comm.status === 'approved' ? 'bg-green-100 text-green-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                {comm.status}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-sm text-slate-500">
-                              {comm.earned_at ? new Date(comm.earned_at).toLocaleDateString() : 'N/A'}
-                            </td>
-                          </tr>
-                        ))}
+                      {getPaginatedData(
+                        commissions.filter(comm => comm.status !== 'paid' && comm.status !== 'completed'),
+                        commissionsPage,
+                        ITEMS_PER_PAGE
+                      ).map(comm => (
+                        <tr key={comm.id}>
+                          <td className="px-4 py-3 text-sm text-white">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${comm.level === 1 ? 'bg-green-100 text-green-800' :
+                              comm.level === 2 ? 'bg-blue-100 text-blue-800' :
+                                'bg-purple-100 text-purple-800'
+                              }`}>
+                              L{comm.level}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-white">₹{comm.order_amount?.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-sm text-white">{comm.commission_rate}%</td>
+                          <td className="px-4 py-3 text-sm font-bold text-green-600">₹{comm.commission_amount?.toFixed(2)}</td>
+                          <td className="px-4 py-3 text-sm">
+                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${comm.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                              comm.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                              {comm.status}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-sm text-slate-500">
+                            {comm.earned_at ? new Date(comm.earned_at).toLocaleDateString() : 'N/A'}
+                          </td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
+                  {commissions.filter(comm => comm.status !== 'paid' && comm.status !== 'completed').length > ITEMS_PER_PAGE && (
+                    <PaginationControls
+                      currentPage={commissionsPage}
+                      totalPages={getTotalPages(
+                        commissions.filter(comm => comm.status !== 'paid' && comm.status !== 'completed').length,
+                        ITEMS_PER_PAGE
+                      )}
+                      onPageChange={setCommissionsPage}
+                    />
+                  )}
                 </div>
 
                 {commissions.filter(comm => comm.status !== 'paid' && comm.status !== 'completed').length === 0 && (
@@ -1082,51 +1158,60 @@ export function ReferralsEnhanced() {
                     <p>No payout requests yet.</p>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {payouts.map(p => (
-                      <div key={String(p.id)} className="bg-slate-800 rounded-lg p-5 border border-cyan-500/30">
-                        <div className="flex justify-between mb-3">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-white font-semibold">Payout #{p.payout_number}</span>
-                              <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(p.status)}`}>{p.status.replace('_', ' ')}</span>
+                  <>
+                    <div className="space-y-4">
+                      {getPaginatedData(payouts, payoutsPage, ITEMS_PER_PAGE).map(p => (
+                        <div key={String(p.id)} className="bg-slate-800 rounded-lg p-5 border border-cyan-500/30">
+                          <div className="flex justify-between mb-3">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <span className="text-white font-semibold">Payout #{p.payout_number}</span>
+                                <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${getStatusColor(p.status)}`}>{p.status.replace('_', ' ')}</span>
+                              </div>
+                              <div className="text-xs text-slate-400 mt-1">Requested: {new Date(p.requested_at).toLocaleString()}</div>
                             </div>
-                            <div className="text-xs text-slate-400 mt-1">Requested: {new Date(p.requested_at).toLocaleString()}</div>
+                            <div className="text-right">
+                              <div className="text-xl font-bold text-white">{formatCurrency(p.net_amount)}</div>
+                              <div className="text-xs text-slate-500">Net Amount</div>
+                            </div>
                           </div>
-                          <div className="text-right">
-                            <div className="text-xl font-bold text-white">{formatCurrency(p.net_amount)}</div>
-                            <div className="text-xs text-slate-500">Net Amount</div>
+                          <div className="grid grid-cols-3 gap-3 text-xs">
+                            <div className="bg-slate-900 rounded p-2">
+                              <div className="text-slate-400 mb-1">Gross Amount</div>
+                              <div className="text-white font-semibold">{formatCurrency(p.gross_amount)}</div>
+                            </div>
+                            <div className="bg-slate-900 rounded p-2">
+                              <div className="text-slate-400 mb-1">TDS (10%)</div>
+                              <div className="text-orange-400 font-semibold">- {formatCurrency(p.tds_amount)}</div>
+                            </div>
+                            <div className="bg-slate-900 rounded p-2">
+                              <div className="text-slate-400 mb-1">Net Amount</div>
+                              <div className="text-emerald-400 font-bold">{formatCurrency(p.net_amount)}</div>
+                            </div>
                           </div>
-                        </div>
-                        <div className="grid grid-cols-3 gap-3 text-xs">
-                          <div className="bg-slate-900 rounded p-2">
-                            <div className="text-slate-400 mb-1">Gross Amount</div>
-                            <div className="text-white font-semibold">{formatCurrency(p.gross_amount)}</div>
+                          <div className="mt-3 text-xs text-slate-400">
+                            Payment Method: <span className="text-white capitalize">{p.payment_method.replace('_', ' ')}</span>
                           </div>
-                          <div className="bg-slate-900 rounded p-2">
-                            <div className="text-slate-400 mb-1">TDS (10%)</div>
-                            <div className="text-orange-400 font-semibold">- {formatCurrency(p.tds_amount)}</div>
+                          <div className="flex justify-between text-xs mt-3">
+                            <span className="text-slate-400">Tax Period: {p.tax_year} Q{p.tax_quarter}</span>
+                            {p.payment_reference && (
+                              <span className="text-green-400 font-mono">Ref: {p.payment_reference}</span>
+                            )}
                           </div>
-                          <div className="bg-slate-900 rounded p-2">
-                            <div className="text-slate-400 mb-1">Net Amount</div>
-                            <div className="text-emerald-400 font-bold">{formatCurrency(p.net_amount)}</div>
-                          </div>
-                        </div>
-                        <div className="mt-3 text-xs text-slate-400">
-                          Payment Method: <span className="text-white capitalize">{p.payment_method.replace('_', ' ')}</span>
-                        </div>
-                        <div className="flex justify-between text-xs mt-3">
-                          <span className="text-slate-400">Tax Period: {p.tax_year} Q{p.tax_quarter}</span>
-                          {p.payment_reference && (
-                            <span className="text-green-400 font-mono">Ref: {p.payment_reference}</span>
+                          {p.rejected_reason && (
+                            <div className="mt-3 text-xs text-red-400">Rejected: {p.rejected_reason}</div>
                           )}
                         </div>
-                        {p.rejected_reason && (
-                          <div className="mt-3 text-xs text-red-400">Rejected: {p.rejected_reason}</div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
+                      ))}
+                    </div>
+                    {payouts.length > ITEMS_PER_PAGE && (
+                      <PaginationControls
+                        currentPage={payoutsPage}
+                        totalPages={getTotalPages(payouts.length, ITEMS_PER_PAGE)}
+                        onPageChange={setPayoutsPage}
+                      />
+                    )}
+                  </>
                 )}
               </div>
             )}

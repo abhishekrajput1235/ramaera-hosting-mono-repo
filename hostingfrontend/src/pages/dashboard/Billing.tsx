@@ -32,6 +32,17 @@ export function Billing() {
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Payment method modal state
+  const [showAddPaymentModal, setShowAddPaymentModal] = useState(false);
+  const [paymentForm, setPaymentForm] = useState({
+    cardNumber: '',
+    cardHolder: '',
+    expiryMonth: '',
+    expiryYear: '',
+    cvv: '',
+    isDefault: false
+  });
+
   useEffect(() => {
     loadBillingData();
   }, []);
@@ -107,6 +118,66 @@ export function Billing() {
 
   const outstandingBalance = calculateOutstandingBalance();
 
+  const handleAddPaymentMethod = async () => {
+    try {
+      // Validate form
+      if (!paymentForm.cardNumber || !paymentForm.cardHolder || !paymentForm.expiryMonth || !paymentForm.expiryYear) {
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      // Basic validation
+      if (paymentForm.cardNumber.replace(/\s/g, '').length !== 16) {
+        alert('Card number must be 16 digits');
+        return;
+      }
+
+      const month = parseInt(paymentForm.expiryMonth);
+      const year = parseInt(paymentForm.expiryYear);
+
+      if (month < 1 || month > 12) {
+        alert('Invalid expiry month');
+        return;
+      }
+
+      if (year < new Date().getFullYear()) {
+        alert('Card has expired');
+        return;
+      }
+
+      // Call backend API
+      await api.post('/api/v1/billing/payment-methods', {
+        card_number: paymentForm.cardNumber.replace(/\s/g, ''),
+        card_holder: paymentForm.cardHolder,
+        expiry_month: month,
+        expiry_year: year,
+        cvv: paymentForm.cvv,
+        is_default: paymentForm.isDefault
+      });
+
+      // Success
+      alert('✅ Payment method added successfully!');
+      setShowAddPaymentModal(false);
+
+      // Reset form
+      setPaymentForm({
+        cardNumber: '',
+        cardHolder: '',
+        expiryMonth: '',
+        expiryYear: '',
+        cvv: '',
+        isDefault: false
+      });
+
+      // Reload payment methods
+      loadBillingData();
+    } catch (error: any) {
+      console.error('Failed to add payment method:', error);
+      const errorMsg = error?.response?.data?.detail || error?.message || 'Failed to add payment method';
+      alert(`❌ ${errorMsg}`);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 w-full h-full overflow-y-auto pb-6 px-2 sm:px-0">
       <div className="mb-4 sm:mb-6">
@@ -136,21 +207,19 @@ export function Billing() {
           <div className="flex w-full min-w-max">
             <button
               onClick={() => setActiveTab('invoices')}
-              className={`flex-1 px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
-                activeTab === 'invoices'
-                  ? 'text-cyan-400 bg-cyan-500/10 border-b-2 border-cyan-500'
-                  : 'text-slate-400 hover:text-slate-300 hover:bg-slate-950'
-              }`}
+              className={`flex-1 px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold transition whitespace-nowrap ${activeTab === 'invoices'
+                ? 'text-cyan-400 bg-cyan-500/10 border-b-2 border-cyan-500'
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-950'
+                }`}
             >
               Invoices
             </button>
             <button
               onClick={() => setActiveTab('payment-methods')}
-              className={`flex-1 px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold transition whitespace-nowrap ${
-                activeTab === 'payment-methods'
-                  ? 'text-cyan-400 bg-cyan-500/10 border-b-2 border-cyan-500'
-                  : 'text-slate-400 hover:text-slate-300 hover:bg-slate-950'
-              }`}
+              className={`flex-1 px-4 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm font-semibold transition whitespace-nowrap ${activeTab === 'payment-methods'
+                ? 'text-cyan-400 bg-cyan-500/10 border-b-2 border-cyan-500'
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-950'
+                }`}
             >
               Payment Methods
             </button>
@@ -220,7 +289,7 @@ export function Billing() {
                                     <span>Pay Now</span>
                                   </button>
                                 )}
-                                <button 
+                                <button
                                   onClick={() => handleViewInvoice(invoice)}
                                   className="inline-flex items-center space-x-1 px-2 sm:px-3 py-1.5 text-xs font-semibold text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10 rounded-lg transition"
                                 >
@@ -243,7 +312,10 @@ export function Billing() {
                 <div className="text-center py-12">
                   <CreditCard className="h-10 w-10 sm:h-12 sm:w-12 text-slate-600 mx-auto mb-4" />
                   <p className="text-sm sm:text-base text-slate-400 mb-4">No payment methods added</p>
-                  <button className="px-4 sm:px-6 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-semibold hover:from-cyan-400 hover:to-teal-400 transition shadow-lg shadow-cyan-500/50 text-sm sm:text-base">
+                  <button
+                    onClick={() => setShowAddPaymentModal(true)}
+                    className="px-4 sm:px-6 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-semibold hover:from-cyan-400 hover:to-teal-400 transition shadow-lg shadow-cyan-500/50 text-sm sm:text-base"
+                  >
                     Add Payment Method
                   </button>
                 </div>
@@ -284,7 +356,10 @@ export function Billing() {
                       </div>
                     </div>
                   ))}
-                  <button className="w-full px-6 py-3 bg-slate-950 border border-cyan-500/30 text-cyan-400 rounded-lg font-semibold hover:bg-cyan-500/10 transition">
+                  <button
+                    onClick={() => setShowAddPaymentModal(true)}
+                    className="w-full px-6 py-3 bg-slate-950 border border-cyan-500/30 text-cyan-400 rounded-lg font-semibold hover:bg-cyan-500/10 transition"
+                  >
                     Add Payment Method
                   </button>
                 </div>
@@ -293,6 +368,123 @@ export function Billing() {
           )}
         </div>
       </div>
+
+      {/* Add Payment Method Modal */}
+      {showAddPaymentModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 rounded-2xl border-2 border-cyan-500 w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <h3 className="text-xl font-bold text-white mb-4">Add Payment Method</h3>
+
+              <div className="space-y-4">
+                {/* Card Number */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Card Number</label>
+                  <input
+                    type="text"
+                    placeholder="1234 5678 9012 3456"
+                    maxLength={19}
+                    value={paymentForm.cardNumber}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/\s/g, '').replace(/\D/g, '');
+                      const formatted = value.match(/.{1,4}/g)?.join(' ') || value;
+                      setPaymentForm({ ...paymentForm, cardNumber: formatted });
+                    }}
+                    className="w-full px-4 py-2 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                {/* Card Holder */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-300 mb-2">Card Holder Name</label>
+                  <input
+                    type="text"
+                    placeholder="John Doe"
+                    value={paymentForm.cardHolder}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, cardHolder: e.target.value })}
+                    className="w-full px-4 py-2 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                  />
+                </div>
+
+                {/* Expiry & CVV */}
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Month</label>
+                    <input
+                      type="text"
+                      placeholder="MM"
+                      maxLength={2}
+                      value={paymentForm.expiryMonth}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        setPaymentForm({ ...paymentForm, expiryMonth: value });
+                      }}
+                      className="w-full px-4 py-2 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">Year</label>
+                    <input
+                      type="text"
+                      placeholder="YYYY"
+                      maxLength={4}
+                      value={paymentForm.expiryYear}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        setPaymentForm({ ...paymentForm, expiryYear: value });
+                      }}
+                      className="w-full px-4 py-2 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">CVV</label>
+                    <input
+                      type="password"
+                      placeholder="123"
+                      maxLength={4}
+                      value={paymentForm.cvv}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/\D/g, '');
+                        setPaymentForm({ ...paymentForm, cvv: value });
+                      }}
+                      className="w-full px-4 py-2 bg-slate-800 border border-cyan-500/30 rounded-lg text-white focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Set as Default */}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="checkbox"
+                    id="isDefault"
+                    checked={paymentForm.isDefault}
+                    onChange={(e) => setPaymentForm({ ...paymentForm, isDefault: e.target.checked })}
+                    className="w-4 h-4 bg-slate-800 border-cyan-500/30 rounded"
+                  />
+                  <label htmlFor="isDefault" className="text-sm text-slate-300">Set as default payment method</label>
+                </div>
+
+                {/* Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowAddPaymentModal(false)}
+                    className="flex-1 px-4 py-2 bg-slate-800 text-slate-300 rounded-lg font-semibold hover:bg-slate-700 transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleAddPaymentMethod}
+                    disabled={loading}
+                    className="flex-1 px-4 py-2 bg-gradient-to-r from-cyan-500 to-teal-500 text-white rounded-lg font-semibold hover:from-cyan-400 hover:to-teal-400 transition disabled:opacity-50"
+                  >
+                    Add Card
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

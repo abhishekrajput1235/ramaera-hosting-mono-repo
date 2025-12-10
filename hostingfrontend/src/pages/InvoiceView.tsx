@@ -31,10 +31,18 @@ interface Invoice {
   payment_method?: string;
   payment_date?: string;
   payment_reference?: string;
+  transaction?: {
+    payment_id: string;
+    transaction_date: string;
+    gateway: string;
+    amount: number;
+    transaction_id: number;
+    payment_method: string;
+  };
 }
 
 export function InvoiceView() {
-  const { invoiceId} = useParams();
+  const { invoiceId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
   const [invoice, setInvoice] = useState<Invoice | null>(location.state?.invoice || null);
@@ -261,10 +269,10 @@ export function InvoiceView() {
           }
         `}
       </style>
-      
+
       <div className="min-h-screen bg-slate-950 py-4 md:py-8">
         <div className="max-w-[210mm] mx-auto px-2 md:px-4">
-          
+
           {/* Header Actions - Hidden in print */}
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-4 md:mb-6 print:hidden no-print gap-3">
             <button
@@ -292,7 +300,7 @@ export function InvoiceView() {
 
           {/* Professional Invoice Document */}
           <div className="bg-white text-black shadow-xl invoice-container">
-            
+
             {/* Header with Logo and Invoice Number */}
             <div className="border-b-4 border-teal-600 p-3 md:p-6 invoice-header">
               <div className="flex flex-col md:flex-row justify-between items-start gap-3 invoice-header-grid">
@@ -308,7 +316,7 @@ export function InvoiceView() {
                     </div>
                   </div>
                 </div>
-                
+
                 {/* Invoice Number & Status */}
                 <div className="text-left md:text-right text-right-desktop w-full md:w-auto">
                   <div className="text-xl md:text-3xl font-bold text-teal-600 mb-1">INVOICE</div>
@@ -320,19 +328,19 @@ export function InvoiceView() {
             {/* Invoice Details Section */}
             <div className="p-3 md:p-6 invoice-body">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-6 mb-3 md:mb-6 invoice-grid invoice-section">
-                
+
                 {/* Issue Date & For */}
                 <div className="space-y-2 md:space-y-3">
                   <div>
                     <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Issue Date:</div>
                     <div className="text-xs md:text-sm font-medium">{new Date(invoice.invoice_date).toLocaleDateString('en-GB')}</div>
                   </div>
-                  
+
                   <div>
                     <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Due Date:</div>
                     <div className="text-xs md:text-sm font-medium text-red-600">{new Date(invoice.due_date).toLocaleDateString('en-GB')}</div>
                   </div>
-                  
+
                   <div className="pt-1 md:pt-2">
                     <div className="text-xs font-semibold text-slate-500 uppercase mb-1">Issue For:</div>
                     <div className="font-semibold text-xs md:text-sm">Valued Customer</div>
@@ -397,7 +405,7 @@ export function InvoiceView() {
                       <span className="text-slate-600">Subtotal:</span>
                       <span className="font-semibold">Rs. {Number(invoice.subtotal || 0).toFixed(2)}</span>
                     </div>
-                    
+
                     {invoice.tax_amount > 0 && (
                       <>
                         <div className="flex justify-between text-xs">
@@ -410,19 +418,19 @@ export function InvoiceView() {
                         </div>
                       </>
                     )}
-                    
+
                     {invoice.amount_paid > 0 && (
                       <div className="flex justify-between text-xs text-green-600">
                         <span>Credits / Paid:</span>
                         <span className="font-semibold">Rs. {Number(invoice.amount_paid).toFixed(2)}</span>
                       </div>
                     )}
-                    
+
                     <div className="flex justify-between text-sm md:text-base font-bold border-t-2 border-slate-300 pt-1.5 md:pt-2 mt-1.5 md:mt-2">
                       <span>Total:</span>
                       <span className="text-teal-600">Rs. {Number(invoice.total_amount || 0).toFixed(2)}</span>
                     </div>
-                    
+
                     {invoice.balance_due > 0 && (
                       <div className="flex justify-between text-sm md:text-base font-bold text-red-600 bg-red-50 -mx-2 px-2 py-1 md:py-1.5 rounded">
                         <span>Balance Due:</span>
@@ -446,6 +454,55 @@ export function InvoiceView() {
                   </div>
                 </div>
               )}
+
+              {/* Transaction History */}
+              {/* {invoice.payment_status === 'paid' && (
+                <div className="mb-3 md:mb-4 invoice-section avoid-break">
+                  <h3 className="font-semibold text-slate-900 mb-2 text-xs md:text-sm">Transaction History</h3>
+                  <div className="overflow-x-auto border border-slate-200 rounded">
+                    <table className="min-w-full divide-y divide-slate-200">
+                      <thead className="bg-slate-50">
+                        <tr>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700">Transaction Date</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700">Gateway</th>
+                          <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700">Transaction ID</th>
+                          <th className="px-3 py-2 text-right text-xs font-semibold text-slate-700">Amount</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-200">
+                        {invoice.transaction ? (
+                          <tr className="bg-white">
+                            <td className="px-3 py-2 text-xs text-slate-700">
+                              {new Date(invoice.transaction.transaction_date).toLocaleString('en-IN', {
+                                year: 'numeric',
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700">
+                              {invoice.transaction.gateway}
+                            </td>
+                            <td className="px-3 py-2 text-xs text-slate-700 font-mono">
+                              {invoice.transaction.payment_id}
+                            </td>
+                            <td className="px-3 py-2 text-right text-xs font-semibold text-slate-900">
+                              Rs. {Number(invoice.transaction.amount).toFixed(2)}
+                            </td>
+                          </tr>
+                        ) : (
+                          <tr>
+                            <td className="px-3 py-3 text-xs text-slate-500 text-center" colSpan={4}>
+                              No transaction history available
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )} */}
 
               {/* Terms & Conditions - Compact */}
               <div className="border-t-2 border-slate-200 pt-3 md:pt-6 mt-3 md:mt-6 invoice-section avoid-break">
