@@ -741,6 +741,16 @@ async def verify_payment(
                 "message": "🎉 Your affiliate account is now active! Start referring and earning today!"
             }
 
+        # Add transaction details for invoice display
+        response["transaction"] = {
+            "payment_id": payment_data.razorpay_payment_id,
+            "transaction_date": payment_transaction.paid_at.isoformat() if payment_transaction.paid_at else datetime.utcnow().isoformat(),
+            "gateway": "Razorpay",
+            "amount": float(payment_transaction.total_amount),
+            "transaction_id": payment_transaction.id,
+            "payment_method": payment_transaction.payment_method or "razorpay"
+        }
+
         return response
 
     except HTTPException as e:

@@ -843,7 +843,8 @@ export function Checkout() {
                   ...verificationResponse.order,
                   payment: verificationResponse.payment,
                   server: verificationResponse.server,
-                  affiliate: verificationResponse.affiliate
+                  affiliate: verificationResponse.affiliate,
+                  transaction: verificationResponse.transaction  // Add transaction data
                 });
 
                 // Save billing info to backend for future use
@@ -2179,11 +2180,34 @@ export function Checkout() {
                             </tr>
                           </thead>
                           <tbody>
-                            <tr>
-                              <td className="px-4 py-4 text-slate-400" colSpan={4}>
-                                No Related Transactions Found
-                              </td>
-                            </tr>
+                            {orderDetails?.transaction ? (
+                              <tr className="bg-slate-900/40">
+                                <td className="px-4 py-4 text-slate-300">
+                                  {new Date(orderDetails.transaction.transaction_date).toLocaleString('en-IN', {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric',
+                                    hour: '2-digit',
+                                    minute: '2-digit'
+                                  })}
+                                </td>
+                                <td className="px-4 py-4 text-slate-300">
+                                  {orderDetails.transaction.gateway}
+                                </td>
+                                <td className="px-4 py-4 text-slate-300 font-mono text-xs">
+                                  {orderDetails.transaction.payment_id}
+                                </td>
+                                <td className="px-4 py-4 text-right text-white font-semibold">
+                                  {formatCurrency(orderDetails.transaction.amount)}
+                                </td>
+                              </tr>
+                            ) : (
+                              <tr>
+                                <td className="px-4 py-4 text-slate-400" colSpan={4}>
+                                  No Related Transactions Found
+                                </td>
+                              </tr>
+                            )}
                           </tbody>
                         </table>
                       </div>
