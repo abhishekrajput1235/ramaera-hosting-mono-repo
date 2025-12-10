@@ -1,7 +1,8 @@
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Server, Cpu, HardDrive, Network, Shield, CheckCircle, AlertCircle } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { API_BASE_URL } from '../lib/api';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ServerType {
   id: number;
@@ -17,6 +18,8 @@ interface ServerType {
 }
 
 export function DedicatedServers() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [servers, setServers] = useState<ServerType[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -60,6 +63,29 @@ export function DedicatedServers() {
 
     fetchServers();
   }, []);
+
+  // Handle deploy button click - navigate to checkout with server config
+  const handleDeploy = (server: ServerType) => {
+    const serverConfig = {
+      planId: server.id,
+      planName: server.name,
+      planType: server.plan_type || 'dedicated',
+      vcpu: server.cpu_cores,
+      ram: server.ram_gb,
+      storage: server.storage_gb,
+      bandwidth: server.bandwidth_gb / 1000, // Convert GB to TB
+      billingCycle: 'monthly',
+      monthlyPrice: Math.round(server.monthly_price),
+      totalPrice: Math.round(server.monthly_price),
+      discount: 0
+    };
+
+    if (user) {
+      navigate('/checkout', { state: { serverConfig } });
+    } else {
+      navigate(`/login?redirect=${encodeURIComponent('/checkout')}`, { state: { serverConfig } });
+    }
+  };
 
   // Your existing loading UI
   if (loading) {
@@ -203,11 +229,10 @@ export function DedicatedServers() {
               {servers.map((server) => (
                 <div
                   key={server.id}
-                  className={`flex flex-col bg-slate-900 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${
-                    server.is_featured
-                      ? 'ring-2 ring-cyan-500 shadow-[0_0_30px_rgba(6,182,212,0.15)] relative transform md:scale-105 z-10'
-                      : 'border border-slate-800 hover:border-cyan-500/30 hover:shadow-xl'
-                  }`}
+                  className={`flex flex-col bg-slate-900 rounded-2xl overflow-hidden transition-all duration-300 hover:-translate-y-1 ${server.is_featured
+                    ? 'ring-2 ring-cyan-500 shadow-[0_0_30px_rgba(6,182,212,0.15)] relative transform md:scale-105 z-10'
+                    : 'border border-slate-800 hover:border-cyan-500/30 hover:shadow-xl'
+                    }`}
                 >
                   {server.is_featured && (
                     <div className="bg-gradient-to-r from-cyan-600 to-teal-600 text-white text-center py-1.5 text-xs font-bold uppercase tracking-wider">
@@ -283,16 +308,15 @@ export function DedicatedServers() {
                     </ul>
 
                     {/* Button */}
-                    <Link
-                      to="/signup"
-                      className={`block w-full text-center px-6 py-3.5 rounded-lg font-bold transition-all ${
-                        server.is_featured
+                    <button
+                      onClick={() => handleDeploy(server)}
+                      className={`block w-full text-center px-6 py-3.5 rounded-lg font-bold transition-all ${server.is_featured
                           ? 'bg-gradient-to-r from-cyan-500 to-teal-500 text-white hover:from-cyan-400 hover:to-teal-400 shadow-lg shadow-cyan-500/20'
                           : 'bg-slate-800 text-white hover:bg-slate-700 hover:text-cyan-400 border border-transparent hover:border-cyan-500/30'
-                      }`}
+                        }`}
                     >
                       Deploy Now
-                    </Link>
+                    </button>
                   </div>
                 </div>
               ))}

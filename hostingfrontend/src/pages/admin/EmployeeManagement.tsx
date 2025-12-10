@@ -48,7 +48,7 @@ export function EmployeeManagement() {
     email: '',
     full_name: '',
     password: '',
-    role: 'support',
+    role: '',  // Will be set to first role from database
     department: 'technical',
   });
 
@@ -70,6 +70,16 @@ export function EmployeeManagement() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  // Set default role when roles are loaded
+  useEffect(() => {
+    if (roles.length > 0 && !employeeForm.role) {
+      const firstActiveRole = roles.find(r => r.is_active);
+      if (firstActiveRole) {
+        setEmployeeForm(prev => ({ ...prev, role: firstActiveRole.code }));
+      }
+    }
+  }, [roles]);
 
   const fetchData = async () => {
     try {
@@ -509,9 +519,21 @@ export function EmployeeManagement() {
                     onChange={(e) => setEmployeeForm({ ...employeeForm, role: e.target.value })}
                     className="w-full px-3 py-2 border-2 border-slate-400 rounded-lg bg-slate-950/60"
                   >
-                    <option value="support">Support Agent</option>
-                    <option value="admin">Administrator</option>
-                    <option value="super_admin">Super Admin</option>
+                    {/* Dynamically populate roles from database */}
+                    {roles.length > 0 ? (
+                      roles.filter(r => r.is_active).map((role) => (
+                        <option key={role.id} value={role.code} className="bg-slate-950/60">
+                          {role.name}
+                        </option>
+                      ))
+                    ) : (
+                      // Fallback options if no roles loaded
+                      <>
+                        <option value="support">Support Agent</option>
+                        <option value="admin">Administrator</option>
+                        <option value="super_admin">Super Admin</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div>

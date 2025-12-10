@@ -8,13 +8,20 @@ interface PlanData {
   name: string;
   slug: string;
   description: string;
-  plan_type: string;  // Added: vps, shared, dedicated, etc.
+  plan_type: string;  // vps, shared, dedicated, etc.
   vcpu: number;
   ram_gb: number;
   storage_gb: number;
   bandwidth_gb: number;
   base_price: number;
+  monthly_price: number;
+  quarterly_price: number;
+  semiannual_price: number | null;
+  annual_price: number;
+  biennial_price: number;
+  triennial_price: number;
   is_active: boolean;
+  is_featured: boolean;
   features: string[];
   created_at: string;
 }
@@ -29,13 +36,20 @@ export function PlansManagement() {
     name: '',
     slug: '',
     description: '',
-    plan_type: 'vps',  // Added: default to 'vps'
+    plan_type: 'vps',
     vcpu: 1,
     ram_gb: 1,
     storage_gb: 20,
     bandwidth_gb: 1000,
     base_price: 0,
+    monthly_price: 0,
+    quarterly_price: 0,
+    semiannual_price: 0,
+    annual_price: 0,
+    biennial_price: 0,
+    triennial_price: 0,
     is_active: true,
+    is_featured: false,
     features: '',
   });
 
@@ -109,9 +123,41 @@ export function PlansManagement() {
       storage_gb: 20,
       bandwidth_gb: 1000,
       base_price: 0,
+      monthly_price: 0,
+      quarterly_price: 0,
+      semiannual_price: 0,
+      annual_price: 0,
+      biennial_price: 0,
+      triennial_price: 0,
       is_active: true,
+      is_featured: false,
       features: '',
     });
+  };
+
+  // Helper to calculate pricing from base price (returns total price for each billing cycle)
+  const calculatePricing = (base: number) => {
+    // Ensure base is a valid number
+    const safeBase = isNaN(base) || base < 0 ? 0 : base;
+    return {
+      monthly_price: Math.round(safeBase),
+      quarterly_price: Math.round(safeBase * 3 * 0.95),     // 3 months with 5% off
+      semiannual_price: Math.round(safeBase * 6 * 0.92),    // 6 months with 8% off
+      annual_price: Math.round(safeBase * 12 * 0.90),       // 12 months with 10% off
+      biennial_price: Math.round(safeBase * 24 * 0.85),     // 24 months with 15% off
+      triennial_price: Math.round(safeBase * 36 * 0.80),    // 36 months with 20% off
+    };
+  };
+
+  // Handle base price change with auto-calculation
+  const handleBasePriceChange = (value: number) => {
+    const safeValue = isNaN(value) ? 0 : value;
+    const pricing = calculatePricing(safeValue);
+    setFormData(prev => ({
+      ...prev,
+      base_price: safeValue,
+      ...pricing,
+    }));
   };
 
   const openEditModal = (plan: PlanData) => {
@@ -126,7 +172,14 @@ export function PlansManagement() {
       storage_gb: plan.storage_gb,
       bandwidth_gb: plan.bandwidth_gb,
       base_price: plan.base_price,
+      monthly_price: plan.monthly_price || plan.base_price,
+      quarterly_price: plan.quarterly_price || plan.base_price * 3 * 0.95,
+      semiannual_price: plan.semiannual_price || plan.base_price * 6 * 0.92,
+      annual_price: plan.annual_price || plan.base_price * 12 * 0.90,
+      biennial_price: plan.biennial_price || plan.base_price * 24 * 0.85,
+      triennial_price: plan.triennial_price || plan.base_price * 36 * 0.80,
       is_active: plan.is_active,
+      is_featured: plan.is_featured || false,
       features: (plan.features || []).join('\n'),
     });
     setShowAddModal(true);
@@ -380,16 +433,90 @@ export function PlansManagement() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Base Price (INR)</label>
+                  <label className="block text-sm font-medium text-slate-300 mb-1">Base Price (INR/month)</label>
                   <input
                     type="number"
                     value={formData.base_price}
-                    onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) })}
+                    onChange={(e) => handleBasePriceChange(parseFloat(e.target.value) || 0)}
                     className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
                     min="0"
-                    step="0.01"
+                    step="1"
                     required
                   />
+                  <p className="text-xs text-slate-500 mt-1">Changing base price auto-calculates all pricing tiers</p>
+                </div>
+
+                {/* Pricing Tiers Section */}
+                <div className="border border-slate-800 rounded-lg p-4 space-y-4">
+                  <h3 className="text-sm font-semibold text-cyan-400">Pricing Tiers (Auto-calculated, override if needed)</h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Monthly</label>
+                      <input
+                        type="number"
+                        value={formData.monthly_price}
+                        onChange={(e) => setFormData({ ...formData, monthly_price: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
+                        min="0"
+                        step="any"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Quarterly (5% off)</label>
+                      <input
+                        type="number"
+                        value={formData.quarterly_price}
+                        onChange={(e) => setFormData({ ...formData, quarterly_price: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
+                        min="0"
+                        step="any"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Semi-Annual (8% off)</label>
+                      <input
+                        type="number"
+                        value={formData.semiannual_price}
+                        onChange={(e) => setFormData({ ...formData, semiannual_price: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
+                        min="0"
+                        step="any"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Annual (10% off)</label>
+                      <input
+                        type="number"
+                        value={formData.annual_price}
+                        onChange={(e) => setFormData({ ...formData, annual_price: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
+                        min="0"
+                        step="any"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Biennial (15% off)</label>
+                      <input
+                        type="number"
+                        value={formData.biennial_price}
+                        onChange={(e) => setFormData({ ...formData, biennial_price: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
+                        min="0"
+                        step="any"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-slate-400 mb-1">Triennial (20% off)</label>
+                      <input
+                        type="number"
+                        value={formData.triennial_price}
+                        onChange={(e) => setFormData({ ...formData, triennial_price: parseFloat(e.target.value) || 0 })}
+                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
+                        min="0"
+                        step="any"
+                      />
+                    </div>
+                  </div>
                 </div>
 
                 <div>
@@ -403,14 +530,25 @@ export function PlansManagement() {
                   />
                 </div>
 
-                <div className="flex items-center text-slate-300">
-                  <input
-                    type="checkbox"
-                    checked={formData.is_active}
-                    onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                    className="mr-2 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-900"
-                  />
-                  <label className="text-sm font-medium">Active</label>
+                <div className="flex items-center gap-6 text-slate-300">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_active}
+                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
+                      className="mr-2 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-900"
+                    />
+                    <label className="text-sm font-medium">Active</label>
+                  </div>
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      checked={formData.is_featured}
+                      onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
+                      className="mr-2 rounded border-slate-600 text-amber-500 focus:ring-amber-500 bg-slate-900"
+                    />
+                    <label className="text-sm font-medium">Featured</label>
+                  </div>
                 </div>
 
                 <div className="flex justify-end gap-2 pt-4">

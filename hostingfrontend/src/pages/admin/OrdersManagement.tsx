@@ -68,6 +68,10 @@ export function OrdersManagement() {
   const [selectedOrder, setSelectedOrder] = useState<OrderData | null>(null);
   const [showDetails, setShowDetails] = useState(false);
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(5);
+
   useEffect(() => {
     fetchOrders();
   }, []);
@@ -141,6 +145,11 @@ export function OrdersManagement() {
 
     return matchesSearch && matchesStatus && matchesPayment;
   });
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, paymentFilter]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-IN', {
@@ -276,86 +285,88 @@ export function OrdersManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-900">
-              {filteredOrders.map((order) => (
-                <tr key={order.id} className="hover:bg-slate-900/60 transition">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <ShoppingCart className="w-5 h-5 text-slate-500 mr-3" />
-                      <div>
-                        <div className="text-sm font-medium text-white">{order.order_number}</div>
-                        <div className="text-xs text-slate-400">{order.billing_cycle}</div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-white">{order.user?.full_name || order.user_email || 'N/A'}</div>
-                    <div className="text-sm text-slate-400">{order.user?.email || order.user_email || 'N/A'}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-white">{order.plan_name}</div>
-                    <div className="text-xs text-slate-400 capitalize">{order.plan_type}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {(order.service_start_date || order.service_end_date) ? (
-                      <div className="text-xs text-slate-400">
-                        <div>{order.service_start_date ? new Date(order.service_start_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
-                        <div className="text-slate-500">to</div>
-                        <div>{order.service_end_date ? new Date(order.service_end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-500">Not set</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-0.5 min-w-[140px]">
-                      {/* Subtotal - always show */}
-                      <div className="text-xs text-slate-400 flex justify-between">
-                        <span>Subtotal:</span>
-                        <span className="text-slate-300">{formatCurrency(Number(order.total_amount) || 0)}</span>
-                      </div>
-                      {/* Discount - show if > 0 */}
-                      {Number(order.discount_amount) > 0 && (
-                        <div className="text-xs text-emerald-400 flex justify-between">
-                          <span>Discount{order.promo_code ? <span className="text-purple-400 ml-1">({order.promo_code})</span> : ''}:</span>
-                          <span>-{formatCurrency(Number(order.discount_amount))}</span>
+              {filteredOrders
+                .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+                .map((order) => (
+                  <tr key={order.id} className="hover:bg-slate-900/60 transition">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="flex items-center">
+                        <ShoppingCart className="w-5 h-5 text-slate-500 mr-3" />
+                        <div>
+                          <div className="text-sm font-medium text-white">{order.order_number}</div>
+                          <div className="text-xs text-slate-400">{order.billing_cycle}</div>
                         </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-white">{order.user?.full_name || order.user_email || 'N/A'}</div>
+                      <div className="text-sm text-slate-400">{order.user?.email || order.user_email || 'N/A'}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-white">{order.plan_name}</div>
+                      <div className="text-xs text-slate-400 capitalize">{order.plan_type}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {(order.service_start_date || order.service_end_date) ? (
+                        <div className="text-xs text-slate-400">
+                          <div>{order.service_start_date ? new Date(order.service_start_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
+                          <div className="text-slate-500">to</div>
+                          <div>{order.service_end_date ? new Date(order.service_end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-slate-500">Not set</span>
                       )}
-                      {/* Tax - always show */}
-                      <div className="text-xs text-slate-400 flex justify-between">
-                        <span>Tax (18%):</span>
-                        <span className="text-slate-300">+{formatCurrency(Number(order.tax_amount) || 0)}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-0.5 min-w-[140px]">
+                        {/* Subtotal - always show */}
+                        <div className="text-xs text-slate-400 flex justify-between">
+                          <span>Subtotal:</span>
+                          <span className="text-slate-300">{formatCurrency(Number(order.total_amount) || 0)}</span>
+                        </div>
+                        {/* Discount - show if > 0 */}
+                        {Number(order.discount_amount) > 0 && (
+                          <div className="text-xs text-emerald-400 flex justify-between">
+                            <span>Discount{order.promo_code ? <span className="text-purple-400 ml-1">({order.promo_code})</span> : ''}:</span>
+                            <span>-{formatCurrency(Number(order.discount_amount))}</span>
+                          </div>
+                        )}
+                        {/* Tax - always show */}
+                        <div className="text-xs text-slate-400 flex justify-between">
+                          <span>Tax (18%):</span>
+                          <span className="text-slate-300">+{formatCurrency(Number(order.tax_amount) || 0)}</span>
+                        </div>
+                        {/* Grand Total - always show */}
+                        <div className="text-sm font-semibold text-cyan-200 pt-1 border-t border-slate-700/50 flex justify-between">
+                          <span>Total:</span>
+                          <span>{formatCurrency(Number(order.grand_total) || 0)}</span>
+                        </div>
                       </div>
-                      {/* Grand Total - always show */}
-                      <div className="text-sm font-semibold text-cyan-200 pt-1 border-t border-slate-700/50 flex justify-between">
-                        <span>Total:</span>
-                        <span>{formatCurrency(Number(order.grand_total) || 0)}</span>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(order.order_status)}`}>
-                      {order.order_status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getPaymentBadge(order.payment_status)}`}>
-                      {order.payment_status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={() => {
-                        setSelectedOrder(order);
-                        setShowDetails(true);
-                      }}
-                      className="p-1 text-cyan-300 hover:bg-cyan-500/10 rounded"
-                      title="View Details"
-                    >
-                      <Eye className="w-4 h-4" />
-                    </button>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(order.order_status)}`}>
+                        {order.order_status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getPaymentBadge(order.payment_status)}`}>
+                        {order.payment_status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => {
+                          setSelectedOrder(order);
+                          setShowDetails(true);
+                        }}
+                        className="p-1 text-cyan-300 hover:bg-cyan-500/10 rounded"
+                        title="View Details"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
@@ -363,6 +374,111 @@ export function OrdersManagement() {
           <div className="text-center py-12 text-slate-500">
             <ShoppingCart className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>No orders found</p>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {filteredOrders.length > 0 && (
+          <div className="p-4 border-t border-slate-900 flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Left side - Info & Rows per page */}
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-slate-400">
+                Showing {Math.min((currentPage - 1) * rowsPerPage + 1, filteredOrders.length)} to{' '}
+                {Math.min(currentPage * rowsPerPage, filteredOrders.length)} of {filteredOrders.length} orders
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500">Rows:</span>
+                <select
+                  value={rowsPerPage}
+                  onChange={(e) => {
+                    setRowsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 bg-slate-900 text-white border border-slate-800 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Right side - Page navigation */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="First page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Previous page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              {/* Page numbers */}
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const totalPages = Math.ceil(filteredOrders.length / rowsPerPage);
+                  const pages = [];
+                  const maxVisiblePages = 5;
+                  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                  if (endPage - startPage + 1 < maxVisiblePages) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                  }
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPage(i)}
+                        className={`px-3 py-1 rounded-lg text-sm font-medium transition ${i === currentPage
+                          ? 'bg-cyan-500 text-white'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}
+                      >
+                        {i}
+                      </button>
+                    );
+                  }
+                  return pages;
+                })()}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(filteredOrders.length / rowsPerPage)))}
+                disabled={currentPage >= Math.ceil(filteredOrders.length / rowsPerPage)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Next page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setCurrentPage(Math.ceil(filteredOrders.length / rowsPerPage))}
+                disabled={currentPage >= Math.ceil(filteredOrders.length / rowsPerPage)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Last page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -543,8 +659,8 @@ export function OrdersManagement() {
                           <div>
                             <span className="text-slate-500">Status:</span>
                             <span className={`ml-2 font-medium ${selectedOrder.payment_metadata.razorpay_details.status === 'captured'
-                                ? 'text-emerald-400'
-                                : 'text-amber-400'
+                              ? 'text-emerald-400'
+                              : 'text-amber-400'
                               }`}>
                               {selectedOrder.payment_metadata.razorpay_details.status}
                             </span>
@@ -722,8 +838,8 @@ export function OrdersManagement() {
                             <div>
                               <span className="text-slate-500">Premium:</span>
                               <span className={`ml-2 font-medium ${selectedOrder.payment_metadata.has_premium_subscription
-                                  ? 'text-emerald-400'
-                                  : 'text-slate-400'
+                                ? 'text-emerald-400'
+                                : 'text-slate-400'
                                 }`}>
                                 {selectedOrder.payment_metadata.has_premium_subscription ? 'Yes' : 'No'}
                               </span>

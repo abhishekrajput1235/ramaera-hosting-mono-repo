@@ -15,6 +15,7 @@ from app.models.roles import Department, Role, Permission, UserDepartment, user_
 from app.models.plan import HostingPlan
 from pydantic import BaseModel
 from typing import Optional
+from decimal import Decimal
 
 router = APIRouter()
 
@@ -70,9 +71,17 @@ class PlanCreate(BaseModel):
     ram_gb: int
     storage_gb: int
     bandwidth_gb: int
-    base_price: float
+    base_price: Decimal
     is_active: bool = True
+    is_featured: bool = False
     features: List[str] = []
+    # Optional custom pricing (if not provided, will be calculated from base_price)
+    monthly_price: Optional[Decimal] = None
+    quarterly_price: Optional[Decimal] = None
+    semiannual_price: Optional[Decimal] = None
+    annual_price: Optional[Decimal] = None
+    biennial_price: Optional[Decimal] = None
+    triennial_price: Optional[Decimal] = None
 
 class PlanUpdate(BaseModel):
     name: Optional[str] = None
@@ -83,9 +92,16 @@ class PlanUpdate(BaseModel):
     ram_gb: Optional[int] = None
     storage_gb: Optional[int] = None
     bandwidth_gb: Optional[int] = None
-    base_price: Optional[float] = None
+    base_price: Optional[Decimal] = None
     is_active: Optional[bool] = None
+    is_featured: Optional[bool] = None
     features: Optional[List[str]] = None
+    monthly_price: Optional[Decimal] = None
+    quarterly_price: Optional[Decimal] = None
+    semiannual_price: Optional[Decimal] = None
+    annual_price: Optional[Decimal] = None
+    biennial_price: Optional[Decimal] = None
+    triennial_price: Optional[Decimal] = None
 
 
 def require_admin(current_user: UserProfile = Depends(get_current_user)):
@@ -850,12 +866,20 @@ async def get_all_plans_admin(
             "name": plan.name,
             "slug": plan.name.lower().replace(" ", "-"),  # Generate slug from name
             "description": plan.description,
+            "plan_type": plan.plan_type,
             "vcpu": plan.cpu_cores,  # Map cpu_cores to vcpu for frontend
             "ram_gb": plan.ram_gb,
             "storage_gb": plan.storage_gb,
             "bandwidth_gb": plan.bandwidth_gb,
             "base_price": float(plan.base_price),
+            "monthly_price": float(plan.monthly_price),
+            "quarterly_price": float(plan.quarterly_price),
+            "semiannual_price": float(plan.semiannual_price) if plan.semiannual_price else None,
+            "annual_price": float(plan.annual_price),
+            "biennial_price": float(plan.biennial_price),
+            "triennial_price": float(plan.triennial_price),
             "is_active": plan.is_active,
+            "is_featured": plan.is_featured,
             "features": plan.features or [],
             "created_at": plan.created_at.isoformat() if plan.created_at else None,
         }
@@ -875,6 +899,17 @@ async def create_plan(
     if existing.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Plan with this name already exists")
 
+    # Use Decimal for precise calculations
+    base = data.base_price
+    
+    # Use custom prices if provided, otherwise calculate from base_price
+    monthly = data.monthly_price if data.monthly_price is not None else base
+    quarterly = data.quarterly_price if data.quarterly_price is not None else base * 3 * Decimal('0.95')
+    semiannual = data.semiannual_price if data.semiannual_price is not None else base * 6 * Decimal('0.92')
+    annual = data.annual_price if data.annual_price is not None else base * 12 * Decimal('0.90')
+    biennial = data.biennial_price if data.biennial_price is not None else base * 24 * Decimal('0.85')
+    triennial = data.triennial_price if data.triennial_price is not None else base * 36 * Decimal('0.80')
+
     plan = HostingPlan(
         name=data.name,
         description=data.description,
@@ -883,13 +918,15 @@ async def create_plan(
         ram_gb=data.ram_gb,
         storage_gb=data.storage_gb,
         bandwidth_gb=data.bandwidth_gb,
-        base_price=data.base_price,
-        monthly_price=data.base_price,  # Default to base_price
-        quarterly_price=data.base_price * 3 * 0.95,  # 5% discount
-        annual_price=data.base_price * 12 * 0.90,  # 10% discount
-        biennial_price=data.base_price * 24 * 0.85,  # 15% discount
-        triennial_price=data.base_price * 36 * 0.80,  # 20% discount
+        base_price=base,
+        monthly_price=monthly,
+        quarterly_price=quarterly,
+        semiannual_price=semiannual,
+        annual_price=annual,
+        biennial_price=biennial,
+        triennial_price=triennial,
         is_active=data.is_active,
+        is_featured=data.is_featured,
         features=data.features
     )
     db.add(plan)
@@ -901,12 +938,20 @@ async def create_plan(
         "name": plan.name,
         "slug": plan.name.lower().replace(" ", "-"),
         "description": plan.description,
+        "plan_type": plan.plan_type,
         "vcpu": plan.cpu_cores,
         "ram_gb": plan.ram_gb,
         "storage_gb": plan.storage_gb,
         "bandwidth_gb": plan.bandwidth_gb,
         "base_price": float(plan.base_price),
+        "monthly_price": float(plan.monthly_price),
+        "quarterly_price": float(plan.quarterly_price),
+        "semiannual_price": float(plan.semiannual_price) if plan.semiannual_price else None,
+        "annual_price": float(plan.annual_price),
+        "biennial_price": float(plan.biennial_price),
+        "triennial_price": float(plan.triennial_price),
         "is_active": plan.is_active,
+        "is_featured": plan.is_featured,
         "features": plan.features or [],
         "created_at": plan.created_at.isoformat() if plan.created_at else None,
     }
@@ -940,17 +985,43 @@ async def update_plan(
         plan.storage_gb = data.storage_gb
     if data.bandwidth_gb is not None:
         plan.bandwidth_gb = data.bandwidth_gb
-    if data.base_price is not None:
-        plan.base_price = data.base_price
-        plan.monthly_price = data.base_price
-        plan.quarterly_price = data.base_price * 3 * 0.95
-        plan.annual_price = data.base_price * 12 * 0.90
-        plan.biennial_price = data.base_price * 24 * 0.85
-        plan.triennial_price = data.base_price * 36 * 0.80
     if data.is_active is not None:
         plan.is_active = data.is_active
+    if data.is_featured is not None:
+        plan.is_featured = data.is_featured
     if data.features is not None:
         plan.features = data.features
+    
+    # Handle pricing updates - use custom values if provided, otherwise recalculate from base_price
+    if data.base_price is not None:
+        plan.base_price = data.base_price
+        # Recalculate all pricing unless individual prices are also provided
+        if data.monthly_price is None:
+            plan.monthly_price = data.base_price
+        if data.quarterly_price is None:
+            plan.quarterly_price = data.base_price * 3 * Decimal('0.95')
+        if data.semiannual_price is None:
+            plan.semiannual_price = data.base_price * 6 * Decimal('0.92')
+        if data.annual_price is None:
+            plan.annual_price = data.base_price * 12 * Decimal('0.90')
+        if data.biennial_price is None:
+            plan.biennial_price = data.base_price * 24 * Decimal('0.85')
+        if data.triennial_price is None:
+            plan.triennial_price = data.base_price * 36 * Decimal('0.80')
+    
+    # Allow individual pricing updates
+    if data.monthly_price is not None:
+        plan.monthly_price = data.monthly_price
+    if data.quarterly_price is not None:
+        plan.quarterly_price = data.quarterly_price
+    if data.semiannual_price is not None:
+        plan.semiannual_price = data.semiannual_price
+    if data.annual_price is not None:
+        plan.annual_price = data.annual_price
+    if data.biennial_price is not None:
+        plan.biennial_price = data.biennial_price
+    if data.triennial_price is not None:
+        plan.triennial_price = data.triennial_price
 
     await db.commit()
     await db.refresh(plan)
@@ -960,12 +1031,20 @@ async def update_plan(
         "name": plan.name,
         "slug": plan.name.lower().replace(" ", "-"),
         "description": plan.description,
+        "plan_type": plan.plan_type,
         "vcpu": plan.cpu_cores,
         "ram_gb": plan.ram_gb,
         "storage_gb": plan.storage_gb,
         "bandwidth_gb": plan.bandwidth_gb,
         "base_price": float(plan.base_price),
+        "monthly_price": float(plan.monthly_price),
+        "quarterly_price": float(plan.quarterly_price),
+        "semiannual_price": float(plan.semiannual_price) if plan.semiannual_price else None,
+        "annual_price": float(plan.annual_price),
+        "biennial_price": float(plan.biennial_price),
+        "triennial_price": float(plan.triennial_price),
         "is_active": plan.is_active,
+        "is_featured": plan.is_featured,
         "features": plan.features or [],
     }
 
