@@ -66,6 +66,14 @@ export function PlansManagement() {
   const [showAddonModal, setShowAddonModal] = useState(false);
   const [editingAddon, setEditingAddon] = useState<AddonData | null>(null);
 
+  // Pagination state - Plans
+  const [plansCurrentPage, setPlansCurrentPage] = useState(1);
+  const [plansRowsPerPage, setPlansRowsPerPage] = useState(5);
+
+  // Pagination state - Addons
+  const [addonsCurrentPage, setAddonsCurrentPage] = useState(1);
+  const [addonsRowsPerPage, setAddonsRowsPerPage] = useState(5);
+
   // Plan form data
   const [planFormData, setPlanFormData] = useState({
     name: '',
@@ -341,6 +349,15 @@ export function PlansManagement() {
     }
   }, [categoryFilter]);
 
+  // Reset pagination when search/filter changes
+  useEffect(() => {
+    setPlansCurrentPage(1);
+  }, [planSearchTerm]);
+
+  useEffect(() => {
+    setAddonsCurrentPage(1);
+  }, [addonSearchTerm, categoryFilter]);
+
   // ========== FILTERED DATA ==========
   const filteredPlans = plans.filter(plan =>
     plan.name.toLowerCase().includes(planSearchTerm.toLowerCase()) ||
@@ -399,8 +416,8 @@ export function PlansManagement() {
           <button
             onClick={() => setActiveTab('plans')}
             className={`flex items-center gap-2 px-6 py-4 font-medium transition ${activeTab === 'plans'
-                ? 'border-b-2 border-cyan-500 text-cyan-400 bg-slate-900/50'
-                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-900/30'
+              ? 'border-b-2 border-cyan-500 text-cyan-400 bg-slate-900/50'
+              : 'text-slate-400 hover:text-slate-300 hover:bg-slate-900/30'
               }`}
           >
             <Server className="w-5 h-5" />
@@ -409,8 +426,8 @@ export function PlansManagement() {
           <button
             onClick={() => setActiveTab('addons')}
             className={`flex items-center gap-2 px-6 py-4 font-medium transition ${activeTab === 'addons'
-                ? 'border-b-2 border-cyan-500 text-cyan-400 bg-slate-900/50'
-                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-900/30'
+              ? 'border-b-2 border-cyan-500 text-cyan-400 bg-slate-900/50'
+              : 'text-slate-400 hover:text-slate-300 hover:bg-slate-900/30'
               }`}
           >
             <Package className="w-5 h-5" />
@@ -430,6 +447,10 @@ export function PlansManagement() {
               onEdit={openPlanModal}
               onDelete={handleDeletePlan}
               formatCurrency={formatCurrency}
+              currentPage={plansCurrentPage}
+              setCurrentPage={setPlansCurrentPage}
+              rowsPerPage={plansRowsPerPage}
+              setRowsPerPage={setPlansRowsPerPage}
             />
           )}
 
@@ -446,6 +467,10 @@ export function PlansManagement() {
               onDelete={handleDeleteAddon}
               formatCurrency={formatCurrency}
               getCategoryBadge={getCategoryBadge}
+              currentPage={addonsCurrentPage}
+              setCurrentPage={setAddonsCurrentPage}
+              rowsPerPage={addonsRowsPerPage}
+              setRowsPerPage={setAddonsRowsPerPage}
             />
           )}
         </div>
@@ -493,9 +518,13 @@ interface PlansContentProps {
   onEdit: (plan: PlanData) => void;
   onDelete: (id: number) => void;
   formatCurrency: (amount: number) => string;
+  currentPage: number;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  rowsPerPage: number;
+  setRowsPerPage: React.Dispatch<React.SetStateAction<number>>;
 }
 
-function PlansContent({ plans, loading, searchTerm, setSearchTerm, onAdd, onEdit, onDelete, formatCurrency }: PlansContentProps) {
+function PlansContent({ plans, loading, searchTerm, setSearchTerm, onAdd, onEdit, onDelete, formatCurrency, currentPage, setCurrentPage, rowsPerPage, setRowsPerPage }: PlansContentProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -541,47 +570,49 @@ function PlansContent({ plans, loading, searchTerm, setSearchTerm, onAdd, onEdit
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {plans.map((plan) => (
-              <tr key={plan.id} className="hover:bg-slate-900/30">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-white">{plan.name}</div>
-                  <div className="text-sm text-slate-500">{plan.slug}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
-                    {plan.plan_type.toUpperCase()}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
-                  {plan.vcpu} vCPU | {plan.ram_gb}GB RAM | {plan.storage_gb}GB
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
-                  {formatCurrency(plan.monthly_price)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${plan.is_active ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
-                    }`}>
-                    {plan.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                  <div className="flex items-center justify-end gap-2">
-                    <button
-                      onClick={() => onEdit(plan)}
-                      className="p-1 text-blue-400 hover:text-blue-300 transition"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => onDelete(plan.id)}
-                      className="p-1 text-red-400 hover:text-red-300 transition"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {plans
+              .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+              .map((plan) => (
+                <tr key={plan.id} className="hover:bg-slate-900/30">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-white">{plan.name}</div>
+                    <div className="text-sm text-slate-500">{plan.slug}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                      {plan.plan_type.toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                    {plan.vcpu} vCPU | {plan.ram_gb}GB RAM | {plan.storage_gb}GB
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                    {formatCurrency(plan.monthly_price)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${plan.is_active ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                      }`}>
+                      {plan.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <div className="flex items-center justify-end gap-2">
+                      <button
+                        onClick={() => onEdit(plan)}
+                        className="p-1 text-blue-400 hover:text-blue-300 transition"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => onDelete(plan.id)}
+                        className="p-1 text-red-400 hover:text-red-300 transition"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
 
@@ -589,6 +620,108 @@ function PlansContent({ plans, loading, searchTerm, setSearchTerm, onAdd, onEdit
           <div className="text-center py-12 text-slate-500">
             <Server className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>No plans found</p>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {plans.length > 0 && (
+          <div className="p-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-slate-400">
+                Showing {Math.min((currentPage - 1) * rowsPerPage + 1, plans.length)} to{' '}
+                {Math.min(currentPage * rowsPerPage, plans.length)} of {plans.length} plans
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500">Rows:</span>
+                <select
+                  value={rowsPerPage}
+                  onChange={(e) => {
+                    setRowsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 bg-slate-900 text-white border border-slate-800 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="First page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Previous page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const totalPages = Math.ceil(plans.length / rowsPerPage);
+                  const pages = [];
+                  const maxVisiblePages = 5;
+                  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                  if (endPage - startPage + 1 < maxVisiblePages) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                  }
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPage(i)}
+                        className={`px-3 py-1 rounded-lg text-sm font-medium transition ${i === currentPage
+                          ? 'bg-cyan-500 text-white'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}
+                      >
+                        {i}
+                      </button>
+                    );
+                  }
+                  return pages;
+                })()}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(plans.length / rowsPerPage)))}
+                disabled={currentPage >= Math.ceil(plans.length / rowsPerPage)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Next page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setCurrentPage(Math.ceil(plans.length / rowsPerPage))}
+                disabled={currentPage >= Math.ceil(plans.length / rowsPerPage)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Last page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
       </div>
@@ -609,9 +742,13 @@ interface AddonsContentProps {
   onDelete: (id: number) => void;
   formatCurrency: (amount: number) => string;
   getCategoryBadge: (category: string) => string;
+  currentPage: number;
+  setCurrentPage: React.Dispatch<React.SetStateAction<number>>;
+  rowsPerPage: number;
+  setRowsPerPage: React.Dispatch<React.SetStateAction<number>>;
 }
 
-function AddonsContent({ addons, loading, searchTerm, setSearchTerm, categoryFilter, setCategoryFilter, onAdd, onEdit, onDelete, formatCurrency, getCategoryBadge }: AddonsContentProps) {
+function AddonsContent({ addons, loading, searchTerm, setSearchTerm, categoryFilter, setCategoryFilter, onAdd, onEdit, onDelete, formatCurrency, getCategoryBadge, currentPage, setCurrentPage, rowsPerPage, setRowsPerPage }: AddonsContentProps) {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -677,45 +814,149 @@ function AddonsContent({ addons, loading, searchTerm, setSearchTerm, categoryFil
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-800">
-            {addons.map((addon) => (
-              <tr key={addon.id} className="hover:bg-slate-900/30">
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-white">{addon.name}</div>
-                  <div className="text-sm text-slate-500">{addon.slug}</div>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${getCategoryBadge(addon.category)}`}>
-                    {addon.category.replace('_', ' ').toUpperCase()}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm font-medium text-white">{formatCurrency(addon.price)}</div>
-                  {addon.unit_label && <div className="text-xs text-slate-500">per {addon.unit_label}</div>}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
-                    {addon.billing_type.replace('_', ' ').toUpperCase()}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${addon.is_active ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
-                    {addon.is_active ? 'Active' : 'Inactive'}
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
-                  <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => onEdit(addon)} className="p-1 text-blue-400 hover:text-blue-300 transition"><Edit className="w-4 h-4" /></button>
-                    <button onClick={() => onDelete(addon.id)} className="p-1 text-red-400 hover:text-red-300 transition"><Trash2 className="w-4 h-4" /></button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+            {addons
+              .slice((currentPage - 1) * rowsPerPage, currentPage * rowsPerPage)
+              .map((addon) => (
+                <tr key={addon.id} className="hover:bg-slate-900/30">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-white">{addon.name}</div>
+                    <div className="text-sm text-slate-500">{addon.slug}</div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${getCategoryBadge(addon.category)}`}>
+                      {addon.category.replace('_', ' ').toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="text-sm font-medium text-white">{formatCurrency(addon.price)}</div>
+                    {addon.unit_label && <div className="text-xs text-slate-500">per {addon.unit_label}</div>}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                      {addon.billing_type.replace('_', ' ').toUpperCase()}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${addon.is_active ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                      {addon.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                    <div className="flex items-center justify-end gap-2">
+                      <button onClick={() => onEdit(addon)} className="p-1 text-blue-400 hover:text-blue-300 transition"><Edit className="w-4 h-4" /></button>
+                      <button onClick={() => onDelete(addon.id)} className="p-1 text-red-400 hover:text-red-300 transition"><Trash2 className="w-4 h-4" /></button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
           </tbody>
         </table>
         {addons.length === 0 && (
           <div className="text-center py-12 text-slate-500">
             <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
             <p>No addons found</p>
+          </div>
+        )}
+
+        {/* Pagination Controls */}
+        {addons.length > 0 && (
+          <div className="p-4 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm text-slate-400">
+                Showing {Math.min((currentPage - 1) * rowsPerPage + 1, addons.length)} to{' '}
+                {Math.min(currentPage * rowsPerPage, addons.length)} of {addons.length} addons
+              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-slate-500">Rows:</span>
+                <select
+                  value={rowsPerPage}
+                  onChange={(e) => {
+                    setRowsPerPage(Number(e.target.value));
+                    setCurrentPage(1);
+                  }}
+                  className="px-2 py-1 bg-slate-900 text-white border border-slate-800 rounded-lg text-sm focus:ring-2 focus:ring-cyan-500"
+                >
+                  <option value={5}>5</option>
+                  <option value={10}>10</option>
+                  <option value={25}>25</option>
+                  <option value={50}>50</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(1)}
+                disabled={currentPage === 1}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="First page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                disabled={currentPage === 1}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Previous page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+              </button>
+
+              <div className="flex items-center gap-1">
+                {(() => {
+                  const totalPages = Math.ceil(addons.length / rowsPerPage);
+                  const pages = [];
+                  const maxVisiblePages = 5;
+                  let startPage = Math.max(1, currentPage - Math.floor(maxVisiblePages / 2));
+                  let endPage = Math.min(totalPages, startPage + maxVisiblePages - 1);
+
+                  if (endPage - startPage + 1 < maxVisiblePages) {
+                    startPage = Math.max(1, endPage - maxVisiblePages + 1);
+                  }
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    pages.push(
+                      <button
+                        key={i}
+                        onClick={() => setCurrentPage(i)}
+                        className={`px-3 py-1 rounded-lg text-sm font-medium transition ${i === currentPage
+                          ? 'bg-cyan-500 text-white'
+                          : 'text-slate-400 hover:text-white hover:bg-slate-800'
+                          }`}
+                      >
+                        {i}
+                      </button>
+                    );
+                  }
+                  return pages;
+                })()}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(prev + 1, Math.ceil(addons.length / rowsPerPage)))}
+                disabled={currentPage >= Math.ceil(addons.length / rowsPerPage)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Next page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+              </button>
+              <button
+                onClick={() => setCurrentPage(Math.ceil(addons.length / rowsPerPage))}
+                disabled={currentPage >= Math.ceil(addons.length / rowsPerPage)}
+                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg disabled:opacity-40 disabled:cursor-not-allowed transition"
+                title="Last page"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                </svg>
+              </button>
+            </div>
           </div>
         )}
       </div>
