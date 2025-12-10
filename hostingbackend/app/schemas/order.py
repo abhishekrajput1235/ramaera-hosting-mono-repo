@@ -339,6 +339,17 @@ class OrderCreate(OrderBase):
     # Service period dates (optional - will be auto-calculated if not provided)
     service_start_date: Optional[datetime] = None
     service_end_date: Optional[datetime] = None
+    
+    # Discount details
+    discount_amount: Optional[Decimal] = Decimal("0.00")
+    promo_code: Optional[str] = None
+
+    # Payment details
+    payment_status: Optional[str] = "pending"
+    payment_method: Optional[str] = None
+    razorpay_order_id: Optional[str] = None
+    razorpay_payment_id: Optional[str] = None
+    paid_at: Optional[datetime] = None
 
     @validator('billing_cycle')
     def validate_billing_cycle(cls, v):
@@ -362,18 +373,42 @@ class OrderUpdate(BaseModel):
 class Order(BaseModel):
     id: int
     user_id: int
-    plan_id: int
+    plan_id: Optional[int] = None
     order_number: str
     order_status: str = "pending"
     payment_status: str = "pending"
     billing_cycle: str
+    
+    # Financial fields
     total_amount: Decimal
+    discount_amount: Optional[Decimal] = Decimal("0.00")
+    tax_amount: Optional[Decimal] = Decimal("0.00")
+    grand_total: Optional[Decimal] = Decimal("0.00")
+    currency: Optional[str] = "INR"
+    promo_code: Optional[str] = None
+    
+    # Server configuration
     server_details: Optional[Dict[str, Any]] = None
+    
+    # Payment info
     payment_method: Optional[str] = None
     payment_reference: Optional[str] = None
     payment_date: Optional[datetime] = None
+    razorpay_order_id: Optional[str] = None
+    razorpay_payment_id: Optional[str] = None
+    paid_at: Optional[datetime] = None
+    
+    # Service dates
+    service_start_date: Optional[datetime] = None
+    service_end_date: Optional[datetime] = None
+    
+    # Timestamps
     created_at: datetime
     updated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    
+    # Additional
+    notes: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -392,6 +427,8 @@ class OrderWithPlan(Order):
     plan_name: str
     plan_type: str
     user_email: str
+    user: Optional[Dict[str, Any]] = None
+    payment_metadata: Optional[Dict[str, Any]] = None  # From PaymentTransaction table
 
 
 # -------------------- PLAN SCHEMA --------------------

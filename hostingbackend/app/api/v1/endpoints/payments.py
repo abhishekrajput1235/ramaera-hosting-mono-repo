@@ -456,8 +456,14 @@ async def verify_payment(
                 billing_cycle=billing_cycle,
                 total_amount=payment_transaction.total_amount,
                 status='active',
-                payment_method='razorpay',
-                payment_status='paid'
+                payment_status='paid',
+                payment_method=payment_transaction.payment_method or 'razorpay',
+                razorpay_order_id=payment_transaction.razorpay_order_id,
+                razorpay_payment_id=payment_transaction.razorpay_payment_id,
+                paid_at=payment_transaction.paid_at or datetime.utcnow(),
+                # Pass discount details from metadata
+                discount_amount=Decimal(str(payment_transaction.payment_metadata.get('discount_amount', 0))),
+                promo_code=payment_transaction.payment_metadata.get('promo_code')
             )
 
             order = await order_service.create_order(db, current_user.id, order_create)

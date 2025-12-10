@@ -819,14 +819,21 @@ export function Checkout() {
 
   // Validate promo code
   const handleApplyPromoCode = () => {
+    console.log('🎫 Applying promo code:', promoCode);
+
     // Mock promo code validation
     if (promoCode.toUpperCase() === 'WELCOME10') {
-      setPromoDiscount(Math.round(calculateSubtotal() * 0.10));
+      const discount = Math.round(calculateSubtotal() * 0.10);
+      setPromoDiscount(discount);
+      console.log('✅ WELCOME10 applied - Discount:', discount);
       alert('Promo code applied! 10% discount');
     } else if (promoCode.toUpperCase() === 'SAVE20') {
-      setPromoDiscount(Math.round(calculateSubtotal() * 0.20));
+      const discount = Math.round(calculateSubtotal() * 0.20);
+      setPromoDiscount(discount);
+      console.log('✅ SAVE20 applied - Discount:', discount);
       alert('Promo code applied! 20% discount');
     } else {
+      console.log('❌ Invalid promo code:', promoCode);
       alert('Invalid promo code');
       setPromoDiscount(0);
     }
@@ -898,6 +905,14 @@ export function Checkout() {
         promo_code: promoCode || null,
         discount_amount: promoDiscount || 0,
         tax_amount: calculateTax() || 0
+      });
+
+      // 🐛 Debug logging
+      console.log('💰 Promo Debug:', {
+        promoCode,
+        promoDiscount,
+        hasPromoCode: !!promoCode,
+        hasPromoDiscount: promoDiscount > 0
       });
 
       if (!paymentOrderResponse.success) {

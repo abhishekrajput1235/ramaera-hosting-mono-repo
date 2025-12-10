@@ -17,6 +17,7 @@ from app.models.order_service import OrderService as OrderServiceModel
 from app.schemas.order import OrderCreate, OrderUpdate, OrderSummary, InvoiceResponse
 from app.models.referrals import ReferralEarning
 from app.services.referral_service import ReferralService
+from app.models.payment import PaymentTransaction
 
 
 class OrderService:
@@ -111,9 +112,10 @@ class OrderService:
         payment_status: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
         query = (
-            select(Order, HostingPlan, UserProfile)
+            select(Order, HostingPlan, UserProfile, PaymentTransaction)
             .join(HostingPlan, Order.plan_id == HostingPlan.id)
             .join(UserProfile, Order.user_id == UserProfile.id)
+            .outerjoin(PaymentTransaction, Order.id == PaymentTransaction.order_id)
         )
 
         if status and status != "all":
@@ -126,27 +128,62 @@ class OrderService:
         rows = result.all()
 
         return [
-            {
-                "id": order.id,
-                "user_id": order.user_id,
-                "plan_id": order.plan_id,
-                "order_number": order.order_number,
-                "order_status": order.order_status,
-                "total_amount": order.total_amount,
-                "payment_status": order.payment_status,
-                "billing_cycle": order.billing_cycle,
-                "server_details": order.server_details,
-                "payment_method": order.payment_method,
-                "payment_reference": order.payment_reference,
-                "payment_date": order.payment_date,
-                "created_at": order.created_at,
-                "updated_at": order.updated_at,
-                "plan_name": plan.name,
-                "plan_type": plan.plan_type,
-                "user_email": user.email,
-            }
-            for order, plan, user in rows
-        ]
+        {
+            "id": order.id,
+            "user_id": order.user_id,
+            "plan_id": order.plan_id,
+            "order_number": order.order_number,
+            "order_status": order.order_status,
+            "payment_status": order.payment_status,
+            "billing_cycle": order.billing_cycle,
+            
+            # Financial Details - Convert Decimal to float for JSON serialization
+            "total_amount": float(order.total_amount) if order.total_amount else 0.0,
+            "discount_amount": float(order.discount_amount) if order.discount_amount else 0.0,
+            "tax_amount": float(order.tax_amount) if order.tax_amount else 0.0,
+            "grand_total": float(order.grand_total) if order.grand_total else 0.0,
+            "currency": order.currency,
+            "promo_code": order.promo_code,
+            
+            # Server Configuration
+            "server_details": order.server_details,
+            
+            # Payment Information
+            "payment_method": order.payment_method,
+            "payment_reference": order.payment_reference,
+            "payment_date": order.payment_date,
+            "razorpay_order_id": order.razorpay_order_id,
+            "razorpay_payment_id": order.razorpay_payment_id,
+            "paid_at": order.paid_at,
+            
+            # Service Dates
+            "service_start_date": order.service_start_date,
+            "service_end_date": order.service_end_date,
+            
+            # Timestamps
+            "created_at": order.created_at,
+            "updated_at": order.updated_at,
+            "completed_at": order.completed_at,
+            
+            # Additional Info
+            "notes": order.notes,
+            
+            # Plan Details
+            "plan_name": plan.name,
+            "plan_type": plan.plan_type,
+            
+            # User Details
+            "user_email": user.email,
+            "user": {
+                "email": user.email,
+                "full_name": user.full_name,
+            },
+            
+            # Payment Metadata
+            "payment_metadata": payment.payment_metadata if payment else None
+        }
+        for order, plan, user, payment in rows
+    ]
 
     # -----------------------------
     # 🔹 CRUD OPERATIONS
@@ -283,8 +320,22 @@ class OrderService:
                     })
 
             # ✅ 7️⃣ Calculate final totals (Plan + Addons + Services)
-            total_discount_amount = plan_discount_amount + sum(a["discount_amount"] for a in addon_records) + sum(s["discount_amount"] for s in service_records)
-            total_discounted = plan_discounted_total + sum(a["subtotal"] - a["discount_amount"] for a in addon_records) + sum(s["subtotal"] - s["discount_amount"] for s in service_records)
+            # Base billing cycle discount
+            billing_cycle_discount = plan_discount_amount + sum(a["discount_amount"] for a in addon_records) + sum(s["discount_amount"] for s in service_records)
+            
+            # Add promo discount from frontend if provided
+            promo_discount = order_data.discount_amount or Decimal("0.00")
+            
+            # Total discount is sum of billing cycle discount + promo discount
+            total_discount_amount = billing_cycle_discount + promo_discount
+            
+            # Calculate discounted total (subtracting promo discount as well)
+            base_discounted = plan_discounted_total + sum(a["subtotal"] - a["discount_amount"] for a in addon_records) + sum(s["subtotal"] - s["discount_amount"] for s in service_records)
+            total_discounted = base_discounted - promo_discount
+            
+            # Ensure total doesn't go below zero
+            if total_discounted < 0:
+                total_discounted = Decimal("0.00")
 
             # GST calculation (18% on total discounted amount)
             gst_amount = (total_discounted * Decimal("18.00")) / Decimal("100.00")
@@ -311,11 +362,16 @@ class OrderService:
                 tax_amount=gst_amount,
                 grand_total=grand_total,
                 server_details=order_data.server_details,  # Kept for backward compatibility
-                order_status="pending",
-                payment_status="pending",
+                order_status="active" if order_data.payment_status == 'paid' else "pending",
+                payment_status=order_data.payment_status or "pending",
+                payment_method=order_data.payment_method,
+                razorpay_order_id=order_data.razorpay_order_id,
+                razorpay_payment_id=order_data.razorpay_payment_id,
+                paid_at=order_data.paid_at,
                 currency="INR",
                 service_start_date=service_start_date,  # 🆕 Set service start date
                 service_end_date=service_end_date,  # 🆕 Set service end date
+                promo_code=order_data.promo_code,  # 🆕 Store promo code
                 created_at=datetime.utcnow(),
                 updated_at=datetime.utcnow(),
             )

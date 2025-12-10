@@ -48,6 +48,7 @@ interface OrderData {
   payment_date?: string;
   razorpay_order_id: string | null;
   razorpay_payment_id: string | null;
+  payment_metadata?: any; // New field
 
   // Additional
   notes?: string;
@@ -74,8 +75,31 @@ export function OrdersManagement() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/api/v1/orders/admin?limit=1000');
-      setOrders(Array.isArray(response) ? response : []);
+      const response = await api.get('/api/v1/orders/admin?limit=1000') as OrderData[] | { data?: OrderData[] };
+      console.log('Orders API Response:', response); // Debug log
+
+      // Handle both direct array response and { data: [...] } response formats
+      let ordersArray: OrderData[] = [];
+      if (Array.isArray(response)) {
+        ordersArray = response;
+      } else if (response && 'data' in response && Array.isArray(response.data)) {
+        ordersArray = response.data;
+      }
+
+      if (ordersArray.length > 0) {
+        const firstOrder = ordersArray[0];
+        console.log('First order sample:', firstOrder); // Debug first order
+        console.log('First order financial data:', {
+          total_amount: firstOrder.total_amount,
+          discount_amount: firstOrder.discount_amount,
+          tax_amount: firstOrder.tax_amount,
+          grand_total: firstOrder.grand_total,
+          promo_code: firstOrder.promo_code,
+          service_start_date: firstOrder.service_start_date,
+          service_end_date: firstOrder.service_end_date,
+        });
+      }
+      setOrders(ordersArray);
     } catch (error) {
       console.error('Error fetching orders:', error);
       setOrders([]);
@@ -83,6 +107,7 @@ export function OrdersManagement() {
       setLoading(false);
     }
   };
+
 
   const getStatusBadge = (status: string) => {
     const styles: Record<string, string> = {
@@ -128,6 +153,14 @@ export function OrdersManagement() {
   };
 
   const formatCurrency = (amount: number) => {
+    // Handle null, undefined, or NaN
+    if (amount === null || amount === undefined || isNaN(amount)) {
+      console.warn('Invalid amount passed to formatCurrency:', amount);
+      return new Intl.NumberFormat('en-IN', {
+        style: 'currency',
+        currency: 'INR',
+      }).format(0);
+    }
     return new Intl.NumberFormat('en-IN', {
       style: 'currency',
       currency: 'INR',
@@ -263,21 +296,41 @@ export function OrdersManagement() {
                     <div className="text-xs text-slate-400 capitalize">{order.plan_type}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
-                    {order.service_start_date && order.service_end_date ? (
+                    {(order.service_start_date || order.service_end_date) ? (
                       <div className="text-xs text-slate-400">
-                        <div>{new Date(order.service_start_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                        <div>{order.service_start_date ? new Date(order.service_start_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
                         <div className="text-slate-500">to</div>
-                        <div>{new Date(order.service_end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' })}</div>
+                        <div>{order.service_end_date ? new Date(order.service_end_date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}</div>
                       </div>
                     ) : (
                       <span className="text-xs text-slate-500">Not set</span>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-cyan-200">{formatCurrency(order.grand_total)}</div>
-                    {order.discount_amount > 0 && (
-                      <div className="text-xs text-emerald-400">-{formatCurrency(order.discount_amount)}</div>
-                    )}
+                  <td className="px-6 py-4">
+                    <div className="space-y-0.5 min-w-[140px]">
+                      {/* Subtotal - always show */}
+                      <div className="text-xs text-slate-400 flex justify-between">
+                        <span>Subtotal:</span>
+                        <span className="text-slate-300">{formatCurrency(Number(order.total_amount) || 0)}</span>
+                      </div>
+                      {/* Discount - show if > 0 */}
+                      {Number(order.discount_amount) > 0 && (
+                        <div className="text-xs text-emerald-400 flex justify-between">
+                          <span>Discount{order.promo_code ? <span className="text-purple-400 ml-1">({order.promo_code})</span> : ''}:</span>
+                          <span>-{formatCurrency(Number(order.discount_amount))}</span>
+                        </div>
+                      )}
+                      {/* Tax - always show */}
+                      <div className="text-xs text-slate-400 flex justify-between">
+                        <span>Tax (18%):</span>
+                        <span className="text-slate-300">+{formatCurrency(Number(order.tax_amount) || 0)}</span>
+                      </div>
+                      {/* Grand Total - always show */}
+                      <div className="text-sm font-semibold text-cyan-200 pt-1 border-t border-slate-700/50 flex justify-between">
+                        <span>Total:</span>
+                        <span>{formatCurrency(Number(order.grand_total) || 0)}</span>
+                      </div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusBadge(order.order_status)}`}>
@@ -476,6 +529,244 @@ export function OrdersManagement() {
                     </div>
                   )}
                 </div>
+
+                {/* Payment Metadata Display - User Friendly */}
+                {selectedOrder.payment_metadata && (
+                  <div className="mt-4 space-y-3">
+                    <h4 className="text-sm font-semibold text-cyan-400">Payment Details</h4>
+
+                    {/* Razorpay Payment Details */}
+                    {selectedOrder.payment_metadata.razorpay_details && (
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                        <p className="text-xs font-semibold text-slate-400 mb-2">Razorpay Transaction</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          <div>
+                            <span className="text-slate-500">Status:</span>
+                            <span className={`ml-2 font-medium ${selectedOrder.payment_metadata.razorpay_details.status === 'captured'
+                                ? 'text-emerald-400'
+                                : 'text-amber-400'
+                              }`}>
+                              {selectedOrder.payment_metadata.razorpay_details.status}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Method:</span>
+                            <span className="ml-2 text-slate-300 font-medium capitalize">
+                              {selectedOrder.payment_metadata.razorpay_details.method || 'N/A'}
+                            </span>
+                          </div>
+                          {selectedOrder.payment_metadata.razorpay_details.bank && (
+                            <div>
+                              <span className="text-slate-500">Bank:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.razorpay_details.bank}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.razorpay_details.wallet && (
+                            <div>
+                              <span className="text-slate-500">Wallet:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.razorpay_details.wallet}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.razorpay_details.vpa && (
+                            <div>
+                              <span className="text-slate-500">UPI ID:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.razorpay_details.vpa}
+                              </span>
+                            </div>
+                          )}
+                          <div>
+                            <span className="text-slate-500">Amount:</span>
+                            <span className="ml-2 text-slate-300 font-medium">
+                              {formatCurrency((selectedOrder.payment_metadata.razorpay_details.amount || 0) / 100)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Fee:</span>
+                            <span className="ml-2 text-slate-300 font-medium">
+                              {formatCurrency((selectedOrder.payment_metadata.razorpay_details.fee || 0) / 100)}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-slate-500">Tax:</span>
+                            <span className="ml-2 text-slate-300 font-medium">
+                              {formatCurrency((selectedOrder.payment_metadata.razorpay_details.tax || 0) / 100)}
+                            </span>
+                          </div>
+                          {selectedOrder.payment_metadata.razorpay_details.email && (
+                            <div className="col-span-2">
+                              <span className="text-slate-500">Email:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.razorpay_details.email}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.razorpay_details.contact && (
+                            <div className="col-span-2">
+                              <span className="text-slate-500">Contact:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.razorpay_details.contact}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Server Configuration */}
+                    {selectedOrder.payment_metadata.server_config && (
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                        <p className="text-xs font-semibold text-slate-400 mb-2">Server Configuration</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {selectedOrder.payment_metadata.server_config.server_name && (
+                            <div>
+                              <span className="text-slate-500">Server Name:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.server_config.server_name}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.server_config.hostname && (
+                            <div>
+                              <span className="text-slate-500">Hostname:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.server_config.hostname}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.server_config.os && (
+                            <div>
+                              <span className="text-slate-500">OS:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.server_config.os}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.server_config.datacenter && (
+                            <div>
+                              <span className="text-slate-500">Datacenter:</span>
+                              <span className="ml-2 text-slate-300 font-medium capitalize">
+                                {selectedOrder.payment_metadata.server_config.datacenter}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.server_config.quantity && (
+                            <div>
+                              <span className="text-slate-500">Quantity:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.server_config.quantity}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Addons */}
+                    {selectedOrder.payment_metadata.addons && selectedOrder.payment_metadata.addons.length > 0 && (
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                        <p className="text-xs font-semibold text-slate-400 mb-2">Addons ({selectedOrder.payment_metadata.addons.length})</p>
+                        <div className="space-y-2">
+                          {selectedOrder.payment_metadata.addons.map((addon: any, index: number) => (
+                            <div key={index} className="flex justify-between items-center text-xs border-b border-slate-800 pb-2 last:border-0 last:pb-0">
+                              <div>
+                                <p className="text-slate-300 font-medium">{addon.addon_name}</p>
+                                <p className="text-slate-500 text-[10px]">
+                                  {addon.quantity} {addon.unit_label || 'unit'}(s)
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-slate-300 font-medium">{formatCurrency(addon.unit_price)}</p>
+                                <p className="text-slate-500 text-[10px]">Subtotal: {formatCurrency(addon.subtotal)}</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Plan Details from Metadata */}
+                    {(selectedOrder.payment_metadata.plan_name || selectedOrder.payment_metadata.billing_cycle) && (
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                        <p className="text-xs font-semibold text-slate-400 mb-2">Plan Information</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {selectedOrder.payment_metadata.plan_name && (
+                            <div>
+                              <span className="text-slate-500">Plan:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {selectedOrder.payment_metadata.plan_name}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.billing_cycle && (
+                            <div>
+                              <span className="text-slate-500">Billing:</span>
+                              <span className="ml-2 text-slate-300 font-medium capitalize">
+                                {selectedOrder.payment_metadata.billing_cycle}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.plan_type && (
+                            <div>
+                              <span className="text-slate-500">Type:</span>
+                              <span className="ml-2 text-slate-300 font-medium uppercase">
+                                {selectedOrder.payment_metadata.plan_type}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.has_premium_subscription !== undefined && (
+                            <div>
+                              <span className="text-slate-500">Premium:</span>
+                              <span className={`ml-2 font-medium ${selectedOrder.payment_metadata.has_premium_subscription
+                                  ? 'text-emerald-400'
+                                  : 'text-slate-400'
+                                }`}>
+                                {selectedOrder.payment_metadata.has_premium_subscription ? 'Yes' : 'No'}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Promo Code & Discounts */}
+                    {(selectedOrder.payment_metadata.promo_code || selectedOrder.payment_metadata.discount_amount > 0) && (
+                      <div className="bg-slate-900/50 p-3 rounded-lg border border-slate-800">
+                        <p className="text-xs font-semibold text-slate-400 mb-2">Discounts & Offers</p>
+                        <div className="grid grid-cols-2 gap-2 text-xs">
+                          {selectedOrder.payment_metadata.promo_code && (
+                            <div>
+                              <span className="text-slate-500">Promo Code:</span>
+                              <span className="ml-2 text-purple-400 font-medium">
+                                {selectedOrder.payment_metadata.promo_code}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.discount_amount > 0 && (
+                            <div>
+                              <span className="text-slate-500">Discount:</span>
+                              <span className="ml-2 text-emerald-400 font-medium">
+                                {formatCurrency(selectedOrder.payment_metadata.discount_amount)}
+                              </span>
+                            </div>
+                          )}
+                          {selectedOrder.payment_metadata.tax_amount > 0 && (
+                            <div>
+                              <span className="text-slate-500">Tax Amount:</span>
+                              <span className="ml-2 text-slate-300 font-medium">
+                                {formatCurrency(selectedOrder.payment_metadata.tax_amount)}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Timeline */}
