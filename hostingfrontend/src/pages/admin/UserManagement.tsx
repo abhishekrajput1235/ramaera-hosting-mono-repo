@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Search, UserPlus, Mail, Shield, Ban } from 'lucide-react';
+import { Search, UserPlus, Mail, Shield, Ban, ChevronLeft, ChevronRight } from 'lucide-react';
 import api from '../../lib/api';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
@@ -19,6 +19,8 @@ export function UserManagement() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterRole, setFilterRole] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
 
   useEffect(() => {
     fetchUsers();
@@ -37,15 +39,30 @@ export function UserManagement() {
   };
 
   const filteredUsers = users.filter(user => {
-    const matchesSearch = 
+    const matchesSearch =
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.full_name?.toLowerCase().includes(searchTerm.toLowerCase());
-    
+
     const matchesRole = filterRole === 'all' || user.role === filterRole;
     const matchesStatus = filterStatus === 'all' || user.account_status === filterStatus;
-    
+
     return matchesSearch && matchesRole && matchesStatus;
   });
+
+  // Pagination calculations
+  const totalPages = Math.ceil(filteredUsers.length / rowsPerPage);
+  const startIndex = (currentPage - 1) * rowsPerPage;
+  const endIndex = startIndex + rowsPerPage;
+  const paginatedUsers = filteredUsers.slice(startIndex, endIndex);
+
+  // Reset to page 1 when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, filterRole, filterStatus]);
+
+  const goToPage = (page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)));
+  };
 
   const getRoleBadgeClass = (role: string) => {
     switch (role) {
@@ -131,7 +148,7 @@ export function UserManagement() {
               />
             </div>
           </div>
-          
+
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-2">Role</label>
             <select
@@ -177,7 +194,7 @@ export function UserManagement() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100 bg-slate-950/60">
-              {filteredUsers.map((user) => (
+              {paginatedUsers.map((user) => (
                 <tr key={user.id} className="hover:bg-slate-50/70 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap ">
                     <div className="flex items-center">
@@ -223,12 +240,112 @@ export function UserManagement() {
             </tbody>
           </table>
         </div>
-        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 text-sm text-slate-500 flex justify-between bg-slate-950/60">
-          <span>
-            Showing <span className="font-semibold text-white">{filteredUsers.length}</span> of{' '}
-            <span className="font-semibold text-white">{users.length}</span> users
-          </span>
-          <span className="text-slate-400">Filters applied: role {filterRole} / status {filterStatus}</span>
+        <div className="px-6 py-4 bg-slate-50 border-t border-slate-200 bg-slate-950/60">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+            {/* Left side - Info */}
+            <div className="text-sm text-slate-500">
+              Showing <span className="font-semibold text-white">{startIndex + 1}</span> to{' '}
+              <span className="font-semibold text-white">{Math.min(endIndex, filteredUsers.length)}</span> of{' '}
+              <span className="font-semibold text-white">{filteredUsers.length}</span> users
+              {filteredUsers.length !== users.length && (
+                <span className="text-slate-400 ml-2">(filtered from {users.length} total)</span>
+              )}
+            </div>
+
+            {/* Center - Page numbers */}
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => goToPage(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                <ChevronLeft className="w-4 h-4 text-white" />
+              </button>
+
+              <div className="flex items-center gap-1">
+                {totalPages <= 7 ? (
+                  // Show all pages if 7 or fewer
+                  Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => goToPage(page)}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition ${currentPage === page
+                          ? 'bg-cyan-600 text-white'
+                          : 'text-slate-400 hover:bg-slate-100'
+                        }`}
+                    >
+                      {page}
+                    </button>
+                  ))
+                ) : (
+                  // Show abbreviated pagination for many pages
+                  <>
+                    <button
+                      onClick={() => goToPage(1)}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition ${currentPage === 1
+                          ? 'bg-cyan-600 text-white'
+                          : 'text-slate-400 hover:bg-slate-100'
+                        }`}
+                    >
+                      1
+                    </button>
+                    {currentPage > 3 && <span className="text-slate-400 px-2">...</span>}
+                    {Array.from({ length: 3 }, (_, i) => currentPage - 1 + i)
+                      .filter((page) => page > 1 && page < totalPages)
+                      .map((page) => (
+                        <button
+                          key={page}
+                          onClick={() => goToPage(page)}
+                          className={`px-3 py-1 rounded-lg text-sm font-medium transition ${currentPage === page
+                              ? 'bg-cyan-600 text-white'
+                              : 'text-slate-400 hover:bg-slate-100'
+                            }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    {currentPage < totalPages - 2 && <span className="text-slate-400 px-2">...</span>}
+                    <button
+                      onClick={() => goToPage(totalPages)}
+                      className={`px-3 py-1 rounded-lg text-sm font-medium transition ${currentPage === totalPages
+                          ? 'bg-cyan-600 text-white'
+                          : 'text-slate-400 hover:bg-slate-100'
+                        }`}
+                    >
+                      {totalPages}
+                    </button>
+                  </>
+                )}
+              </div>
+
+              <button
+                onClick={() => goToPage(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-lg border border-slate-200 hover:bg-slate-100 disabled:opacity-50 disabled:cursor-not-allowed transition"
+              >
+                <ChevronRight className="w-4 h-4 text-white" />
+              </button>
+            </div>
+
+            {/* Right side - Rows per page */}
+            <div className="flex items-center gap-2 text-sm text-slate-500">
+              <span>Rows per page:</span>
+              <select
+                value={rowsPerPage}
+                onChange={(e) => {
+                  setRowsPerPage(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+                className="px-2 py-1 border border-slate-200 rounded-lg focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-950/60 text-white"
+              >
+                <option value={5}>5</option>
+                <option value={10}>10</option>
+                <option value={25}>25</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+              </select>
+            </div>
+          </div>
         </div>
       </div>
     </div>

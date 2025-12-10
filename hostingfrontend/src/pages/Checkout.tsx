@@ -231,6 +231,28 @@ export function Checkout() {
   const billingCountryLabel = useMemo(() => getCountryLabel(billingInfo.country, countries), [billingInfo.country, countries]);
   const isBillingCountryIndia = useMemo(() => isCountryIndia(billingInfo.country, countries), [billingInfo.country, countries]);
 
+  // Group addons by category for dynamic rendering
+  const addonsByCategory = useMemo(() => {
+    const grouped: Record<string, typeof addons> = {
+      storage: [],
+      bandwidth: [],
+      ip_address: [],
+      control_panel: [],
+      backup: [],
+      ssl: [],
+      support: [],
+      management: [],
+      security: [],
+    };
+    addons.forEach(addon => {
+      if (grouped[addon.category]) {
+        grouped[addon.category].push(addon);
+      }
+    });
+    return grouped;
+  }, [addons]);
+
+
   // Configuration options state
   const [operatingSystem, setOperatingSystem] = useState('almalinux-8.4');
   const [datacenter, setDatacenter] = useState('noida-india');
@@ -397,7 +419,7 @@ export function Checkout() {
     }
   `;
 
-  // Calculate add-ons cost
+  // Calculate add-ons cost - FULLY DYNAMIC (no hardcoded slugs!)
   const calculateAddOnsCost = () => {
     let addOnsCost = 0;
 
@@ -428,287 +450,150 @@ export function Checkout() {
       addOnsCost += backupAddon?.price || 500;
     }
 
-    // Managed server (self, basic, premium)
-    if (managedService === 'basic') {
-      const managedBasicAddon = getAddonBySlug('managed-basic');
-      addOnsCost += managedBasicAddon?.price || 2000;
-    } else if (managedService === 'premium') {
-      const managedPremiumAddon = getAddonBySlug('managed-premium');
-      addOnsCost += managedPremiumAddon?.price || 5000;
-    }
-    // managedService === 'self' adds nothing
-
-    // DDoS protection
-    if (ddosProtection === 'advanced') {
-      const ddosAdvancedAddon = getAddonBySlug('ddos-advanced');
-      addOnsCost += ddosAdvancedAddon?.price || 1000;
-    } else if (ddosProtection === 'enterprise') {
-      const ddosEnterpriseAddon = getAddonBySlug('ddos-enterprise');
-      addOnsCost += ddosEnterpriseAddon?.price || 3000;
+    // Managed service - Use slug directly from dropdown
+    if (managedService && managedService !== 'self') {
+      const addon = getAddonBySlug(managedService);
+      if (addon) addOnsCost += addon.price;
     }
 
-    // Plesk addons
-    if (pleskAddon === 'admin') {
-      const pleskAdminAddon = getAddonBySlug('plesk-admin');
-      addOnsCost += pleskAdminAddon?.price || 950; // 10 domains
-    } else if (pleskAddon === 'pro') {
-      const pleskProAddon = getAddonBySlug('plesk-pro');
-      addOnsCost += pleskProAddon?.price || 1750; // 30 domains
-    } else if (pleskAddon === 'host') {
-      const pleskHostAddon = getAddonBySlug('plesk-host');
-      addOnsCost += pleskHostAddon?.price || 2650; // Unlimited domains
+    // DDoS protection - Use slug directly from dropdown
+    if (ddosProtection && ddosProtection !== 'basic') {
+      const addon = getAddonBySlug(ddosProtection);
+      if (addon) addOnsCost += addon.price;
     }
 
-
-    // Backup storage - Get prices from backend
-    if (backupStorage === '100gb') {
-      const addon = getAddonBySlug('backup-storage-100gb');
-      addOnsCost += addon?.price || 750;
-    } else if (backupStorage === '200gb') {
-      const addon = getAddonBySlug('backup-storage-200gb');
-      addOnsCost += addon?.price || 1500;
-    } else if (backupStorage === '300gb') {
-      const addon = getAddonBySlug('backup-storage-300gb');
-      addOnsCost += addon?.price || 2250;
-    } else if (backupStorage === '500gb') {
-      const addon = getAddonBySlug('backup-storage-500gb');
-      addOnsCost += addon?.price || 3750;
-    } else if (backupStorage === '1000gb') {
-      const addon = getAddonBySlug('backup-storage-1000gb');
-      addOnsCost += addon?.price || 7500;
+    // Plesk addon - Use slug directly from dropdown
+    if (pleskAddon) {
+      const addon = getAddonBySlug(pleskAddon);
+      if (addon) addOnsCost += addon.price;
     }
 
-    // SSL certificates - Get prices from backend
-    if (sslCertificate === 'essential') {
-      const addon = getAddonBySlug('ssl-essential');
-      addOnsCost += addon?.price || 225;
-    } else if (sslCertificate === 'essential-wildcard') {
-      const addon = getAddonBySlug('ssl-essential-wildcard');
-      addOnsCost += addon?.price || 1162;
-    } else if (sslCertificate === 'comodo') {
-      const addon = getAddonBySlug('ssl-comodo');
-      addOnsCost += addon?.price || 208;
-    } else if (sslCertificate === 'comodo-wildcard') {
-      const addon = getAddonBySlug('ssl-comodo-wildcard');
-      addOnsCost += addon?.price || 1084;
-    } else if (sslCertificate === 'rapid') {
-      const addon = getAddonBySlug('ssl-rapid');
-      addOnsCost += addon?.price || 250;
-    } else if (sslCertificate === 'rapid-wildcard') {
-      const addon = getAddonBySlug('ssl-rapid-wildcard');
-      addOnsCost += addon?.price || 1371;
+    // Backup storage - Use slug directly from dropdown
+    if (backupStorage) {
+      const addon = getAddonBySlug(backupStorage);
+      if (addon) addOnsCost += addon.price;
     }
 
-    // Support packages - Get prices from backend
-    if (supportPackage === 'basic') {
-      const addon = getAddonBySlug('support-basic');
-      addOnsCost += addon?.price || 2500;
-    } else if (supportPackage === 'premium') {
-      const addon = getAddonBySlug('support-premium');
-      addOnsCost += addon?.price || 7500;
+    // SSL certificate - Use slug directly from dropdown
+    if (sslCertificate) {
+      const addon = getAddonBySlug(sslCertificate);
+      if (addon) addOnsCost += addon.price;
+    }
+
+    // Support package - Use slug directly from dropdown
+    if (supportPackage) {
+      const addon = getAddonBySlug(supportPackage);
+      if (addon) addOnsCost += addon.price;
     }
 
     return addOnsCost;
   };
 
-  // Calculate selected addons with structured data for backend
+  // Helper functions to get addon prices from backend
+  const getAddonPrice = (slug: string, fallback: number = 0): number => {
+    const addon = getAddonBySlug(slug);
+    return addon?.price || fallback;
+  };
+
+  const getPleskPrice = (): number => {
+    if (!pleskAddon) return 0;
+    const addon = getAddonBySlug(`plesk-${pleskAddon}`);
+    return addon?.price || 0;
+  };
+
+  const getBackupStoragePrice = (): number => {
+    if (!backupStorage) return 0;
+    const addon = getAddonBySlug(`backup-storage-${backupStorage}`);
+    return addon?.price || 0;
+  };
+
+  const getSslPrice = (): number => {
+    if (!sslCertificate) return 0;
+    const addon = getAddonBySlug(`ssl-${sslCertificate}`);
+    return addon?.price || 0;
+  };
+
+  const getSupportPrice = (): number => {
+    if (!supportPackage) return 0;
+    const addon = getAddonBySlug(`support-${supportPackage}`);
+    return addon?.price || 0;
+  };
+
+  const getManagedServicePrice = (): number => {
+    if (managedService === 'self') return 0;
+    const addon = getAddonBySlug(`managed-${managedService}`);
+    return addon?.price || 0;
+  };
+
+  const getDdosPrice = (): number => {
+    if (ddosProtection === 'basic') return 0;
+    const addon = getAddonBySlug(`ddos-${ddosProtection}`);
+    return addon?.price || 0;
+  };
+
+  // Calculate selected addons with structured data for backend - FULLY DYNAMIC
   const calculateSelectedAddons = () => {
     const selectedAddons = [];
 
-    // Extra Storage
-    if (extraStorage > 0) {
-      const addon = getAddonBySlug('extra-storage');
+    // Helper function to add an addon by slug (reduces code duplication)
+    const addAddonBySlug = (slug: string, quantity: number = 1, unitLabel?: string) => {
+      const addon = getAddonBySlug(slug);
       if (addon) {
         selectedAddons.push({
           addon_id: addon.id,
           addon_slug: addon.slug,
           addon_name: addon.name,
-          quantity: extraStorage,
+          quantity,
           unit_price: addon.price,
-          subtotal: extraStorage * addon.price,
-          unit_label: addon.unit_label || 'GB'
+          subtotal: quantity * addon.price,
+          unit_label: unitLabel || addon.unit_label || 'service'
         });
       }
+    };
+
+    // Extra Storage
+    if (extraStorage > 0) {
+      addAddonBySlug('extra-storage', extraStorage, 'GB');
     }
 
     // Extra Bandwidth
     if (extraBandwidth > 0) {
-      const addon = getAddonBySlug('extra-bandwidth');
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: extraBandwidth,
-          unit_price: addon.price,
-          subtotal: extraBandwidth * addon.price,
-          unit_label: addon.unit_label || 'TB'
-        });
-      }
+      addAddonBySlug('extra-bandwidth', extraBandwidth, 'TB');
     }
 
     // Additional IPv4
     if (additionalIPv4 > 0) {
-      const addon = getAddonBySlug('additional-ipv4');
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: additionalIPv4,
-          unit_price: addon.price,
-          subtotal: additionalIPv4 * addon.price,
-          unit_label: addon.unit_label || 'IP'
-        });
-      }
+      addAddonBySlug('additional-ipv4', additionalIPv4, 'IP');
     }
 
-    // Managed Service
-    if (managedService === 'basic') {
-      const addon = getAddonBySlug('managed-basic');
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: 'service'
-        });
-      }
-    } else if (managedService === 'premium') {
-      const addon = getAddonBySlug('managed-premium');
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: 'service'
-        });
-      }
+    // Managed Service - use slug directly from dropdown
+    if (managedService && managedService !== 'self') {
+      addAddonBySlug(managedService);
     }
 
-    // DDoS Protection
-    if (ddosProtection === 'advanced') {
-      const addon = getAddonBySlug('ddos-advanced');
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: 'service'
-        });
-      }
-    } else if (ddosProtection === 'enterprise') {
-      const addon = getAddonBySlug('ddos-enterprise');
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: 'service'
-        });
-      }
+    // DDoS Protection - use slug directly from dropdown
+    if (ddosProtection && ddosProtection !== 'basic') {
+      addAddonBySlug(ddosProtection);
     }
 
-    // Plesk Addons
-    if (pleskAddon === 'admin') {
-      const addon = getAddonBySlug('plesk-admin');
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: 'license'
-        });
-      }
-    } else if (pleskAddon === 'pro') {
-      const addon = getAddonBySlug('plesk-pro');
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: 'license'
-        });
-      }
-    } else if (pleskAddon === 'host') {
-      const addon = getAddonBySlug('plesk-host');
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: 'license'
-        });
-      }
+    // Plesk addon - use slug directly from dropdown
+    if (pleskAddon) {
+      addAddonBySlug(pleskAddon, 1, 'license');
     }
 
-    // Backup Storage - Get addon from backend
+    // Backup Storage - use slug directly from dropdown
     if (backupStorage && backupStorage !== 'none') {
-      const addon = getAddonBySlug(`backup-storage-${backupStorage}`);
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: addon.unit_label || 'storage'
-        });
-      }
+      addAddonBySlug(backupStorage);
     }
 
-    // SSL Certificate - Get addon from backend
+    // SSL Certificate - use slug directly from dropdown
     if (sslCertificate && sslCertificate !== 'none') {
-      const addon = getAddonBySlug(`ssl-${sslCertificate}`);
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: addon.unit_label || 'certificate'
-        });
-      }
+      addAddonBySlug(sslCertificate, 1, 'certificate');
     }
 
-    // Support Package - Get addon from backend
+    // Support Package - use slug directly from dropdown
     if (supportPackage && supportPackage !== 'none') {
-      const addon = getAddonBySlug(`support-${supportPackage}`);
-      if (addon) {
-        selectedAddons.push({
-          addon_id: addon.id,
-          addon_slug: addon.slug,
-          addon_name: addon.name,
-          quantity: 1,
-          unit_price: addon.price,
-          subtotal: addon.price,
-          unit_label: addon.unit_label || 'service'
-        });
-      }
+      addAddonBySlug(supportPackage);
     }
 
     return selectedAddons;
@@ -1389,7 +1274,7 @@ export function Checkout() {
                             <div className="flex items-start justify-between mb-3">
                               <div className="flex-1">
                                 <p className="font-medium text-white text-sm lg:text-base mb-1">Additional IPv4 Addresses</p>
-                                <p className="text-xs lg:text-sm text-slate-400">{formatCurrency(200)}/month per IP</p>
+                                <p className="text-xs lg:text-sm text-slate-400">{formatCurrency(getAddonPrice('additional-ipv4'))}/month per IP</p>
                               </div>
                             </div>
                             <div className="flex flex-col gap-2">
@@ -1397,7 +1282,7 @@ export function Checkout() {
                                 <button
                                   type="button"
                                   onClick={() => setAdditionalIPv4(Math.max(0, additionalIPv4 - 1))}
-                                  className="flex-1 h-12 bg-slate-800 text-white rounded-lg hover:bg-slate-700 active:bg-slate-600 flex items-center justify-center touch-manipulation transition-all font-semibold"
+                                  className="flex-1 h-12 bg-slate-800 text-white rounded-lg hover:bg-slate-700 flex items-center justify-center touch-manipulation transition-all font-semibold"
                                 >
                                   <Minus className="h-5 w-5 mr-1" /> Decrease
                                 </button>
@@ -1501,14 +1386,16 @@ export function Checkout() {
                             <select
                               value={pleskAddon}
                               onChange={(e) => setPleskAddon(e.target.value)}
-                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]"
-                            >
+                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]">
                               <option value="">None</option>
-                              <option value="admin">Plesk Admin - ₹950/month</option>
-                              <option value="pro">Plesk Pro - ₹1,750/month</option>
-                              <option value="host">Plesk Host - ₹2,650/month</option>
+                              {addonsByCategory.control_panel?.map(addon => (
+                                <option key={addon.id} value={addon.slug}>
+                                  {addon.name} - {formatCurrency(addon.price)}/month
+                                </option>
+                              ))}
                             </select>
                           </div>
+
 
                           {/* Backup Storage - Dropdown Selector */}
                           <div className="p-3 lg:p-4 bg-slate-900 rounded-lg border border-slate-700">
@@ -1519,14 +1406,13 @@ export function Checkout() {
                             <select
                               value={backupStorage}
                               onChange={(e) => setBackupStorage(e.target.value)}
-                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]"
-                            >
+                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]">
                               <option value="">None</option>
-                              <option value="100gb">100GB - ₹750/month</option>
-                              <option value="200gb">200GB - ₹1,500/month</option>
-                              <option value="300gb">300GB - ₹2,250/month</option>
-                              <option value="500gb">500GB - ₹3,750/month</option>
-                              <option value="1000gb">1000GB - ₹7,500/month</option>
+                              {addonsByCategory.storage?.filter(a => a.slug.includes('backup-storage')).map(addon => (
+                                <option key={addon.id} value={addon.slug}>
+                                  {addon.name} - {formatCurrency(addon.price)}/month
+                                </option>
+                              ))}
                             </select>
                           </div>
 
@@ -1539,15 +1425,13 @@ export function Checkout() {
                             <select
                               value={sslCertificate}
                               onChange={(e) => setSslCertificate(e.target.value)}
-                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]"
-                            >
+                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]">
                               <option value="">None</option>
-                              <option value="essential">Essential SSL - ₹225/month</option>
-                              <option value="essential-wildcard">Essential Wildcard - ₹1,162/month</option>
-                              <option value="comodo">Comodo SSL - ₹208/month</option>
-                              <option value="comodo-wildcard">Comodo Wildcard - ₹1,084/month</option>
-                              <option value="rapid">RapidSSL - ₹250/month</option>
-                              <option value="rapid-wildcard">RapidSSL Wildcard - ₹1,371/month</option>
+                              {addonsByCategory.security?.filter(a => a.slug.includes('ssl-')).map(addon => (
+                                <option key={addon.id} value={addon.slug}>
+                                  {addon.name} - {formatCurrency(addon.price)}/year
+                                </option>
+                              ))}
                             </select>
                           </div>
 
@@ -1559,11 +1443,13 @@ export function Checkout() {
                             <select
                               value={supportPackage}
                               onChange={(e) => setSupportPackage(e.target.value)}
-                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]"
-                            >
+                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]">
                               <option value="">None</option>
-                              <option value="basic">Basic Support - ₹2,500/month</option>
-                              <option value="premium">Premium Support - ₹7,500/month</option>
+                              {addonsByCategory.support?.map(addon => (
+                                <option key={addon.id} value={addon.slug}>
+                                  {addon.name} - {formatCurrency(addon.price)}/month
+                                </option>
+                              ))}
                             </select>
                           </div>
 
@@ -1576,11 +1462,13 @@ export function Checkout() {
                             <select
                               value={managedService}
                               onChange={(e) => setManagedService(e.target.value)}
-                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]"
-                            >
+                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]">
                               <option value="self">Self-Managed (Free)</option>
-                              <option value="basic">Basic Management - ₹2,000/month</option>
-                              <option value="premium">Premium Management - ₹5,000/month</option>
+                              {addonsByCategory.management?.map(addon => (
+                                <option key={addon.id} value={addon.slug}>
+                                  {addon.name} - {formatCurrency(addon.price)}/month
+                                </option>
+                              ))}
                             </select>
                           </div>
 
@@ -1593,13 +1481,16 @@ export function Checkout() {
                             <select
                               value={ddosProtection}
                               onChange={(e) => setDdosProtection(e.target.value)}
-                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]"
-                            >
+                              className="w-full px-3 py-2.5 lg:py-3 bg-slate-800 border border-slate-600 rounded-lg text-white text-sm lg:text-base focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500 touch-manipulation min-h-[44px]">
                               <option value="basic">Basic (Free - Included)</option>
-                              <option value="advanced">Advanced - ₹1,000/month</option>
-                              <option value="enterprise">Enterprise - ₹3,000/month</option>
+                              {addonsByCategory.security?.filter(a => a.slug.includes('ddos-')).map(addon => (
+                                <option key={addon.id} value={addon.slug}>
+                                  {addon.name} - {formatCurrency(addon.price)}/month
+                                </option>
+                              ))}
                             </select>
                           </div>
+
                         </div>
                       </div>
                     </div>
@@ -2396,47 +2287,41 @@ export function Checkout() {
                 {additionalIPv4 > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» Additional IPv4 ({additionalIPv4}x):</span>
-                    <span className="text-white">{formatCurrency((additionalIPv4 * 200) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getAddonPrice('additional-ipv4') * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {pleskAddon && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» Plesk {pleskAddon === 'admin' ? 'Admin' : pleskAddon === 'pro' ? 'Pro' : 'Host'}:</span>
-                    <span className="text-white">{formatCurrency((pleskAddon === 'admin' ? 950 : pleskAddon === 'pro' ? 1750 : 2650) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getAddonPrice(pleskAddon) * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {backupStorage && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» Backup {backupStorage.toUpperCase()}:</span>
-                    <span className="text-white">{formatCurrency((backupStorage === '100gb' ? 750 : backupStorage === '200gb' ? 1500 : backupStorage === '300gb' ? 2250 : backupStorage === '500gb' ? 3750 : 7500) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getAddonPrice(backupStorage) * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {sslCertificate && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» SSL {
-                      sslCertificate === 'essential' ? 'Essential' :
-                        sslCertificate === 'essential-wildcard' ? 'Essential Wildcard' :
-                          sslCertificate === 'comodo' ? 'Comodo' :
-                            sslCertificate === 'comodo-wildcard' ? 'Comodo Wildcard' :
-                              sslCertificate === 'rapid' ? 'RapidSSL' : 'RapidSSL Wildcard'
+                      sslCertificate === 'ssl-essential' ? 'Essential' :
+                        sslCertificate === 'ssl-essential-wildcard' ? 'Essential Wildcard' :
+                          sslCertificate === 'ssl-comodo' ? 'Comodo' :
+                            sslCertificate === 'ssl-comodo-wildcard' ? 'Comodo Wildcard' :
+                              sslCertificate === 'ssl-rapid' ? 'RapidSSL' : 'RapidSSL Wildcard'
                     }:</span>
-                    <span className="text-white">{formatCurrency((
-                      sslCertificate === 'essential' ? 225 :
-                        sslCertificate === 'essential-wildcard' ? 1162 :
-                          sslCertificate === 'comodo' ? 208 :
-                            sslCertificate === 'comodo-wildcard' ? 1084 :
-                              sslCertificate === 'rapid' ? 250 : 1371
-                    ) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getAddonPrice(sslCertificate) * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {supportPackage && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» Support {supportPackage === 'basic' ? 'Basic' : 'Premium'}:</span>
-                    <span className="text-white">{formatCurrency((supportPackage === 'basic' ? 2500 : 7500) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getAddonPrice(supportPackage) * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
@@ -2626,49 +2511,49 @@ export function Checkout() {
                 {additionalIPv4 > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-300">Additional IPv4 ({additionalIPv4}x):</span>
-                    <span className="text-white">{formatCurrency((additionalIPv4 * 200) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency((additionalIPv4 * getAddonPrice('additional-ipv4')) * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {pleskAddon && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-300">Plesk {pleskAddon === 'admin' ? 'Admin' : pleskAddon === 'pro' ? 'Pro' : 'Host'}:</span>
-                    <span className="text-white">{formatCurrency((pleskAddon === 'admin' ? 950 : pleskAddon === 'pro' ? 1750 : 2650) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getPleskPrice() * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {backupStorage && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-300">Backup {backupStorage.toUpperCase()}:</span>
-                    <span className="text-white">{formatCurrency((backupStorage === '100gb' ? 750 : backupStorage === '200gb' ? 1500 : backupStorage === '300gb' ? 2250 : backupStorage === '500gb' ? 3750 : 7500) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getBackupStoragePrice() * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {sslCertificate && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-300">SSL Certificate:</span>
-                    <span className="text-white">{formatCurrency((sslCertificate === 'essential' ? 225 : sslCertificate === 'essential-wildcard' ? 1162 : sslCertificate === 'comodo' ? 208 : sslCertificate === 'comodo-wildcard' ? 1084 : sslCertificate === 'rapid' ? 250 : 1371) * (currentStep >= 2 ? serverQuantity : 1))}/mo</span>
+                    <span className="text-white">{formatCurrency(getSslPrice() * (currentStep >= 2 ? serverQuantity : 1))}/mo</span>
                   </div>
                 )}
 
                 {supportPackage && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-300">Support {supportPackage === 'basic' ? 'Basic' : 'Premium'}:</span>
-                    <span className="text-white">{formatCurrency((supportPackage === 'basic' ? 2500 : 7500) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getSupportPrice() * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {managedService !== 'self' && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-300">{managedService === 'basic' ? 'Basic' : 'Premium'} Management:</span>
-                    <span className="text-white">{formatCurrency((managedService === 'basic' ? 2000 : 5000) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getManagedServicePrice() * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {ddosProtection !== 'basic' && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-300">DDoS {ddosProtection === 'advanced' ? 'Advanced' : 'Enterprise'}:</span>
-                    <span className="text-white">{formatCurrency((ddosProtection === 'advanced' ? 1000 : 3000) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getDdosPrice() * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
               </div>
@@ -2776,7 +2661,7 @@ export function Checkout() {
                 {additionalIPv4 > 0 && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» Additional IPv4 ({additionalIPv4}x):</span>
-                    <span className="text-white">{formatCurrency((additionalIPv4 * 200) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency((additionalIPv4 * getAddonPrice('additional-ipv4')) * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
@@ -2797,14 +2682,14 @@ export function Checkout() {
                 {pleskAddon && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» Plesk {pleskAddon === 'admin' ? 'Admin' : pleskAddon === 'pro' ? 'Pro' : 'Host'}:</span>
-                    <span className="text-white">{formatCurrency((pleskAddon === 'admin' ? 950 : pleskAddon === 'pro' ? 1750 : 2650) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getPleskPrice() * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {backupStorage && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» Backup Storage {backupStorage.toUpperCase()}:</span>
-                    <span className="text-white">{formatCurrency((backupStorage === '100gb' ? 750 : backupStorage === '200gb' ? 1500 : backupStorage === '300gb' ? 2250 : backupStorage === '500gb' ? 3750 : 7500) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getBackupStoragePrice() * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
@@ -2817,20 +2702,14 @@ export function Checkout() {
                             sslCertificate === 'comodo-wildcard' ? 'Comodo Wildcard' :
                               sslCertificate === 'rapid' ? 'RapidSSL' : 'RapidSSL Wildcard'
                     }:</span>
-                    <span className="text-white">{formatCurrency((
-                      sslCertificate === 'essential' ? 225 :
-                        sslCertificate === 'essential-wildcard' ? 1162 :
-                          sslCertificate === 'comodo' ? 208 :
-                            sslCertificate === 'comodo-wildcard' ? 1084 :
-                              sslCertificate === 'rapid' ? 250 : 1371
-                    ) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getSslPrice() * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 
                 {supportPackage && (
                   <div className="flex justify-between text-sm">
                     <span className="text-slate-400">» {supportPackage === 'basic' ? 'Basic' : 'Premium'} Support:</span>
-                    <span className="text-white">{formatCurrency((supportPackage === 'basic' ? 2500 : 7500) * (currentStep >= 2 ? serverQuantity : 1))}</span>
+                    <span className="text-white">{formatCurrency(getSupportPrice() * (currentStep >= 2 ? serverQuantity : 1))}</span>
                   </div>
                 )}
 

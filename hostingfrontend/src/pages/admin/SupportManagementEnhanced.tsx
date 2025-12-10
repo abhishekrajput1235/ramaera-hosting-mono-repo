@@ -312,7 +312,7 @@ export function SupportManagementEnhanced() {
                     <button
                       key={ticket.id}
                       onClick={() => loadTicketDetail(ticket.id)}
-                      className={`w-full text-left p-4 rounded-2xl border transition hover:border-cyan-200 ${isActive ? 'border-cyan-300 bg-cyan-50/50' : 'border-slate-200 bg-slate-950/60'
+                      className={`w-full text-left p-4 rounded-2xl border transition hover:border-cyan-200 ${isActive ? 'border-cyan-300 ' : 'border-slate-200 '
                         }`}
                     >
                       <div className="flex items-center justify-between gap-3 mb-2 ">
@@ -425,11 +425,11 @@ export function SupportManagementEnhanced() {
                     <UserIcon className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-semibold text-slate-900">{selectedTicket.user_name}</p>
+                    <p className="font-semibold text-yellow-600">{selectedTicket.user_name}</p>
                     <p className="text-xs text-slate-500">{selectedTicket.user_email}</p>
                   </div>
                 </div>
-                <p className="text-sm text-slate-600 whitespace-pre-line">{selectedTicket.description}</p>
+                <p className="text-sm text-red-600 whitespace-pre-line">{selectedTicket.description}</p>
               </div>
 
               <div className="mt-6 space-y-4 flex-1 overflow-y-auto">

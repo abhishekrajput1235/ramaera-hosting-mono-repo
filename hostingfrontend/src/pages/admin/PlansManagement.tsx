@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Package, Search, RefreshCw, Plus, Edit, Trash2, Eye } from 'lucide-react';
+import { Server, Package, Plus, Edit, Trash2, Search, RefreshCw } from 'lucide-react';
 import api from '../../lib/api';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
 
+// ========== INTERFACES ==========
 interface PlanData {
   id: number;
   name: string;
   slug: string;
   description: string;
-  plan_type: string;  // vps, shared, dedicated, etc.
+  plan_type: string;
   vcpu: number;
   ram_gb: number;
   storage_gb: number;
@@ -26,13 +27,47 @@ interface PlanData {
   created_at: string;
 }
 
+interface AddonData {
+  id: number;
+  name: string;
+  slug: string;
+  category: string;
+  description?: string;
+  price: number;
+  billing_type: string;
+  unit_label?: string;
+  is_active: boolean;
+  is_featured: boolean;
+  min_quantity: number;
+  max_quantity?: number;
+  default_quantity: number;
+  sort_order: number;
+  icon?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export function PlansManagement() {
+  // ========== STATE ==========
+  const [activeTab, setActiveTab] = useState<'plans' | 'addons'>('plans');
+
+  // Plans state
   const [plans, setPlans] = useState<PlanData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [showAddModal, setShowAddModal] = useState(false);
+  const [plansLoading, setPlansLoading] = useState(true);
+  const [planSearchTerm, setPlanSearchTerm] = useState('');
+  const [showPlanModal, setShowPlanModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<PlanData | null>(null);
-  const [formData, setFormData] = useState({
+
+  // Addons state
+  const [addons, setAddons] = useState<AddonData[]>([]);
+  const [addonsLoading, setAddonsLoading] = useState(true);
+  const [addonSearchTerm, setAddonSearchTerm] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [showAddonModal, setShowAddonModal] = useState(false);
+  const [editingAddon, setEditingAddon] = useState<AddonData | null>(null);
+
+  // Plan form data
+  const [planFormData, setPlanFormData] = useState({
     name: '',
     slug: '',
     description: '',
@@ -53,57 +88,89 @@ export function PlansManagement() {
     features: '',
   });
 
-  useEffect(() => {
-    fetchPlans();
-  }, []);
+  // Addon form data
+  const [addonFormData, setAddonFormData] = useState({
+    name: '',
+    slug: '',
+    category: 'storage',
+    description: '',
+    price: 0,
+    billing_type: 'monthly',
+    unit_label: '',
+    is_active: true,
+    is_featured: false,
+    min_quantity: 0,
+    max_quantity: null as number | null,
+    default_quantity: 0,
+    sort_order: 0,
+    icon: '',
+  });
 
+  // ========== EFFECTS ==========
+  useEffect(() => {
+    if (activeTab === 'plans') {
+      fetchPlans();
+    } else {
+      fetchAddons();
+    }
+  }, [activeTab]);
+
+  // ========== API CALLS - PLANS ==========
   const fetchPlans = async () => {
     try {
-      setLoading(true);
-      const response = await api.request('/api/v1/plans', { method: 'GET' });
+      setPlansLoading(true);
+      const response = await api.get('/api/v1/admin/plans');
       setPlans(Array.isArray(response) ? response : []);
     } catch (error) {
       console.error('Error fetching plans:', error);
       setPlans([]);
     } finally {
-      setLoading(false);
+      setPlansLoading(false);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleCreatePlan = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const planData = {
-        ...formData,
-        features: formData.features.split('\n').filter(f => f.trim()),
-      };
-
-      if (editingPlan) {
-        await api.request(`/api/v1/admin/plans/${editingPlan.id}`, {
-          method: 'PUT',
-          body: JSON.stringify(planData),
-        });
-      } else {
-        await api.request('/api/v1/admin/plans', {
-          method: 'POST',
-          body: JSON.stringify(planData),
-        });
-      }
+      const featuresArray = planFormData.features.split('\\n').filter(f => f.trim());
+      await api.post('/api/v1/admin/plans', {
+        ...planFormData,
+        features: featuresArray,
+      });
       await fetchPlans();
-      setShowAddModal(false);
-      setEditingPlan(null);
-      resetForm();
-      alert(editingPlan ? 'Plan updated successfully' : 'Plan created successfully');
+      setShowPlanModal(false);
+      resetPlanForm();
+      alert('Plan created successfully');
     } catch (error) {
-      console.error('Error saving plan:', error);
-      alert('Failed to save plan');
+      console.error('Error creating plan:', error);
+      alert('Failed to create plan');
     }
   };
 
-  const handleDelete = async (planId: number) => {
+  const handleUpdatePlan = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingPlan) return;
+    try {
+      const featuresArray = planFormData.features.split('\\n').filter(f => f.trim());
+      await api.put(`/api/v1/admin/plans/${editingPlan.id}`, {
+        ...planFormData,
+        features: featuresArray,
+      });
+      await fetchPlans();
+      setShowPlanModal(false);
+      setEditingPlan(null);
+      resetPlanForm();
+      alert('Plan updated successfully');
+    } catch (error) {
+      console.error('Error updating plan:', error);
+      alert('Failed to update plan');
+    }
+  };
+
+  const handleDeletePlan = async (id: number) => {
     if (!confirm('Are you sure you want to delete this plan?')) return;
     try {
-      await api.request(`/api/v1/admin/plans/${planId}`, { method: 'DELETE' });
+      await api.delete(`/api/v1/admin/plans/${id}`);
       await fetchPlans();
       alert('Plan deleted successfully');
     } catch (error) {
@@ -112,8 +179,35 @@ export function PlansManagement() {
     }
   };
 
-  const resetForm = () => {
-    setFormData({
+  const openPlanModal = (plan?: PlanData) => {
+    if (plan) {
+      setEditingPlan(plan);
+      setPlanFormData({
+        name: plan.name,
+        slug: plan.slug,
+        description: plan.description || '',
+        plan_type: plan.plan_type,
+        vcpu: plan.vcpu,
+        ram_gb: plan.ram_gb,
+        storage_gb: plan.storage_gb,
+        bandwidth_gb: plan.bandwidth_gb,
+        base_price: plan.base_price,
+        monthly_price: plan.monthly_price,
+        quarterly_price: plan.quarterly_price,
+        semiannual_price: plan.semiannual_price || 0,
+        annual_price: plan.annual_price,
+        biennial_price: plan.biennial_price,
+        triennial_price: plan.triennial_price,
+        is_active: plan.is_active,
+        is_featured: plan.is_featured,
+        features: (plan.features || []).join('\\n'),
+      });
+    }
+    setShowPlanModal(true);
+  };
+
+  const resetPlanForm = () => {
+    setPlanFormData({
       name: '',
       slug: '',
       description: '',
@@ -135,442 +229,651 @@ export function PlansManagement() {
     });
   };
 
-  // Helper to calculate pricing from base price (returns total price for each billing cycle)
-  const calculatePricing = (base: number) => {
-    // Ensure base is a valid number
-    const safeBase = isNaN(base) || base < 0 ? 0 : base;
-    return {
-      monthly_price: Math.round(safeBase),
-      quarterly_price: Math.round(safeBase * 3 * 0.95),     // 3 months with 5% off
-      semiannual_price: Math.round(safeBase * 6 * 0.92),    // 6 months with 8% off
-      annual_price: Math.round(safeBase * 12 * 0.90),       // 12 months with 10% off
-      biennial_price: Math.round(safeBase * 24 * 0.85),     // 24 months with 15% off
-      triennial_price: Math.round(safeBase * 36 * 0.80),    // 36 months with 20% off
-    };
+  // ========== API CALLS - ADDONS ==========
+  const fetchAddons = async () => {
+    try {
+      setAddonsLoading(true);
+      const params = new URLSearchParams();
+      if (categoryFilter !== 'all') params.append('category', categoryFilter);
+      const response = await api.get(`/api/v1/addons/?${params}`);
+      setAddons(Array.isArray(response) ? response : []);
+    } catch (error) {
+      console.error('Error fetching addons:', error);
+      setAddons([]);
+    } finally {
+      setAddonsLoading(false);
+    }
   };
 
-  // Handle base price change with auto-calculation
-  const handleBasePriceChange = (value: number) => {
-    const safeValue = isNaN(value) ? 0 : value;
-    const pricing = calculatePricing(safeValue);
-    setFormData(prev => ({
-      ...prev,
-      base_price: safeValue,
-      ...pricing,
-    }));
+  const handleCreateAddon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.post('/api/v1/addons/', {
+        ...addonFormData,
+        max_quantity: addonFormData.max_quantity || null,
+      });
+      await fetchAddons();
+      setShowAddonModal(false);
+      resetAddonForm();
+      alert('Addon created successfully');
+    } catch (error) {
+      console.error('Error creating addon:', error);
+      alert('Failed to create addon');
+    }
   };
 
-  const openEditModal = (plan: PlanData) => {
-    setEditingPlan(plan);
-    setFormData({
-      name: plan.name,
-      slug: plan.slug,
-      description: plan.description || '',
-      plan_type: plan.plan_type || 'vps',
-      vcpu: plan.vcpu,
-      ram_gb: plan.ram_gb,
-      storage_gb: plan.storage_gb,
-      bandwidth_gb: plan.bandwidth_gb,
-      base_price: plan.base_price,
-      monthly_price: plan.monthly_price || plan.base_price,
-      quarterly_price: plan.quarterly_price || plan.base_price * 3 * 0.95,
-      semiannual_price: plan.semiannual_price || plan.base_price * 6 * 0.92,
-      annual_price: plan.annual_price || plan.base_price * 12 * 0.90,
-      biennial_price: plan.biennial_price || plan.base_price * 24 * 0.85,
-      triennial_price: plan.triennial_price || plan.base_price * 36 * 0.80,
-      is_active: plan.is_active,
-      is_featured: plan.is_featured || false,
-      features: (plan.features || []).join('\n'),
+  const handleUpdateAddon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAddon) return;
+    try {
+      await api.put(`/api/v1/addons/${editingAddon.id}`, {
+        ...addonFormData,
+        max_quantity: addonFormData.max_quantity || null,
+      });
+      await fetchAddons();
+      setShowAddonModal(false);
+      setEditingAddon(null);
+      resetAddonForm();
+      alert('Addon updated successfully');
+    } catch (error) {
+      console.error('Error updating addon:', error);
+      alert('Failed to update addon');
+    }
+  };
+
+  const handleDeleteAddon = async (id: number) => {
+    if (!confirm('Are you sure you want to delete this addon?')) return;
+    try {
+      await api.delete(`/api/v1/addons/${id}`);
+      await fetchAddons();
+      alert('Addon deleted successfully');
+    } catch (error) {
+      console.error('Error deleting addon:', error);
+      alert('Failed to delete addon');
+    }
+  };
+
+  const openAddonModal = (addon?: AddonData) => {
+    if (addon) {
+      setEditingAddon(addon);
+      setAddonFormData({
+        name: addon.name,
+        slug: addon.slug,
+        category: addon.category,
+        description: addon.description || '',
+        price: addon.price,
+        billing_type: addon.billing_type,
+        unit_label: addon.unit_label || '',
+        is_active: addon.is_active,
+        is_featured: addon.is_featured,
+        min_quantity: addon.min_quantity,
+        max_quantity: addon.max_quantity || null,
+        default_quantity: addon.default_quantity,
+        sort_order: addon.sort_order,
+        icon: addon.icon || '',
+      });
+    }
+    setShowAddonModal(true);
+  };
+
+  const resetAddonForm = () => {
+    setAddonFormData({
+      name: '',
+      slug: '',
+      category: 'storage',
+      description: '',
+      price: 0,
+      billing_type: 'monthly',
+      unit_label: '',
+      is_active: true,
+      is_featured: false,
+      min_quantity: 0,
+      max_quantity: null,
+      default_quantity: 0,
+      sort_order: 0,
+      icon: '',
     });
-    setShowAddModal(true);
   };
 
+  useEffect(() => {
+    if (categoryFilter !== 'all') {
+      fetchAddons();
+    }
+  }, [categoryFilter]);
+
+  // ========== FILTERED DATA ==========
   const filteredPlans = plans.filter(plan =>
-    plan.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    plan.slug.toLowerCase().includes(searchTerm.toLowerCase())
+    plan.name.toLowerCase().includes(planSearchTerm.toLowerCase()) ||
+    plan.slug.toLowerCase().includes(planSearchTerm.toLowerCase())
   );
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(amount);
+  const filteredAddons = addons.filter(addon =>
+    addon.name.toLowerCase().includes(addonSearchTerm.toLowerCase()) ||
+    addon.slug.toLowerCase().includes(addonSearchTerm.toLowerCase())
+  );
+
+  // ========== HELPER FUNCTIONS ==========
+  const getCategoryBadge = (category: string) => {
+    const badges: Record<string, string> = {
+      storage: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+      bandwidth: 'bg-green-500/10 text-green-400 border-green-500/20',
+      ip_address: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+      control_panel: 'bg-orange-500/10 text-orange-400 border-orange-500/20',
+      backup: 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20',
+      ssl: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+      support: 'bg-pink-500/10 text-pink-400 border-pink-500/20',
+      management: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20',
+      security: 'bg-red-500/10 text-red-400 border-red-500/20',
+      cpu: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
+    };
+    return badges[category.toLowerCase()] || 'bg-slate-500/10 text-slate-400 border-slate-500/20';
   };
 
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-IN', {
+      style: 'currency',
+      currency: 'INR',
+    }).format(amount);
+  };
+
+  // ========== RENDER ==========
+  return (
+    <div className="space-y-6">
+      <AdminPageHeader
+        title="Plans & Addons Management"
+        description="Manage server hosting plans and add-on services"
+        actions={
+          <button
+            onClick={() => activeTab === 'plans' ? fetchPlans() : fetchAddons()}
+            className="flex items-center gap-2 px-4 py-2 bg-slate-950/60 border border-slate-800 text-slate-400 rounded-xl hover:bg-slate-900 transition"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </button>
+        }
+      />
+
+      {/* Tab Buttons */}
+      <div className="bg-slate-950/60 rounded-xl border border-slate-900 overflow-hidden">
+        <div className="flex border-b border-slate-800">
+          <button
+            onClick={() => setActiveTab('plans')}
+            className={`flex items-center gap-2 px-6 py-4 font-medium transition ${activeTab === 'plans'
+                ? 'border-b-2 border-cyan-500 text-cyan-400 bg-slate-900/50'
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-900/30'
+              }`}
+          >
+            <Server className="w-5 h-5" />
+            Server Plans
+          </button>
+          <button
+            onClick={() => setActiveTab('addons')}
+            className={`flex items-center gap-2 px-6 py-4 font-medium transition ${activeTab === 'addons'
+                ? 'border-b-2 border-cyan-500 text-cyan-400 bg-slate-900/50'
+                : 'text-slate-400 hover:text-slate-300 hover:bg-slate-900/30'
+              }`}
+          >
+            <Package className="w-5 h-5" />
+            Addons Management
+          </button>
+        </div>
+
+        {/* Tab Content */}
+        <div className="p-6">
+          {activeTab === 'plans' && (
+            <PlansContent
+              plans={filteredPlans}
+              loading={plansLoading}
+              searchTerm={planSearchTerm}
+              setSearchTerm={setPlanSearchTerm}
+              onAdd={() => openPlanModal()}
+              onEdit={openPlanModal}
+              onDelete={handleDeletePlan}
+              formatCurrency={formatCurrency}
+            />
+          )}
+
+          {activeTab === 'addons' && (
+            <AddonsContent
+              addons={filteredAddons}
+              loading={addonsLoading}
+              searchTerm={addonSearchTerm}
+              setSearchTerm={setAddonSearchTerm}
+              categoryFilter={categoryFilter}
+              setCategoryFilter={setCategoryFilter}
+              onAdd={() => openAddonModal()}
+              onEdit={openAddonModal}
+              onDelete={handleDeleteAddon}
+              formatCurrency={formatCurrency}
+              getCategoryBadge={getCategoryBadge}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Plan Modal */}
+      {showPlanModal && (
+        <PlanModal
+          isEditing={!!editingPlan}
+          formData={planFormData}
+          setFormData={setPlanFormData}
+          onSubmit={editingPlan ? handleUpdatePlan : handleCreatePlan}
+          onClose={() => {
+            setShowPlanModal(false);
+            setEditingPlan(null);
+            resetPlanForm();
+          }}
+        />
+      )}
+
+      {/* Addon Modal */}
+      {showAddonModal && (
+        <AddonModal
+          isEditing={!!editingAddon}
+          formData={addonFormData}
+          setFormData={setAddonFormData}
+          onSubmit={editingAddon ? handleUpdateAddon : handleCreateAddon}
+          onClose={() => {
+            setShowAddonModal(false);
+            setEditingAddon(null);
+            resetAddonForm();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+// ========== PLANS CONTENT COMPONENT ==========
+interface PlansContentProps {
+  plans: PlanData[];
+  loading: boolean;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  onAdd: () => void;
+  onEdit: (plan: PlanData) => void;
+  onDelete: (id: number) => void;
+  formatCurrency: (amount: number) => string;
+}
+
+function PlansContent({ plans, loading, searchTerm, setSearchTerm, onAdd, onEdit, onDelete, formatCurrency }: PlansContentProps) {
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <AdminPageHeader
-        title="Plans Management"
-        description="Control every hosting package, pricing tier, and feature bundle before it reaches customers."
-        actions={
-          <>
-            <button
-              onClick={fetchPlans}
-              className="flex items-center gap-2 px-4 py-2 bg-slate-900 text-slate-200 rounded-xl border border-slate-800 hover:bg-slate-900/70 transition"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </button>
-            <button
-              onClick={() => { resetForm(); setEditingPlan(null); setShowAddModal(true); }}
-              className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-xl hover:from-cyan-400 hover:to-blue-400 transition shadow-lg shadow-cyan-500/30"
-            >
-              <Plus className="w-4 h-4" />
-              Add Plan
-            </button>
-          </>
-        }
-      />
-
-      {/* Search */}
-      <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-900 shadow-[0_15px_45px_rgba(2,6,23,0.7)]">
-        <div className="relative">
+    <div className="space-y-4">
+      {/* Search and Add */}
+      <div className="flex justify-between items-center gap-4">
+        <div className="relative flex-1 max-w-md">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5" />
           <input
             type="text"
             placeholder="Search plans..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 bg-slate-900 text-white border border-slate-800 rounded-xl focus:ring-2 focus:ring-cyan-500 placeholder-slate-500"
+            className="w-full pl-10 pr-4 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500"
           />
         </div>
+        <button
+          onClick={onAdd}
+          className="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition"
+        >
+          <Plus className="w-4 h-4" />
+          Add Plan
+        </button>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-900">
-          <p className="text-sm text-slate-400">Total Plans</p>
-          <p className="text-2xl font-bold text-white">{plans.length}</p>
-        </div>
-        <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-900">
-          <p className="text-sm text-slate-400">Active Plans</p>
-          <p className="text-2xl font-bold text-emerald-400">{plans.filter(p => p.is_active).length}</p>
-        </div>
-        <div className="bg-slate-950/60 p-4 rounded-2xl border border-slate-900">
-          <p className="text-sm text-slate-400">Avg Price</p>
-          <p className="text-2xl font-bold text-cyan-300">
-            {formatCurrency(plans.length ? plans.reduce((s, p) => s + p.base_price, 0) / plans.length : 0)}
-          </p>
-        </div>
-      </div>
+      {/* Plans Table */}
+      <div className="overflow-x-auto rounded-lg border border-slate-800">
+        <table className="min-w-full divide-y divide-slate-800">
+          <thead className="bg-slate-900/50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Plan Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Type</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Specs</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Monthly Price</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800">
+            {plans.map((plan) => (
+              <tr key={plan.id} className="hover:bg-slate-900/30">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-white">{plan.name}</div>
+                  <div className="text-sm text-slate-500">{plan.slug}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+                    {plan.plan_type.toUpperCase()}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">
+                  {plan.vcpu} vCPU | {plan.ram_gb}GB RAM | {plan.storage_gb}GB
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">
+                  {formatCurrency(plan.monthly_price)}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${plan.is_active ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'
+                    }`}>
+                    {plan.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                  <div className="flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => onEdit(plan)}
+                      className="p-1 text-blue-400 hover:text-blue-300 transition"
+                    >
+                      <Edit className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onDelete(plan.id)}
+                      className="p-1 text-red-400 hover:text-red-300 transition"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
-      {/* Plans Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredPlans.map((plan) => (
-          <div key={plan.id} className="bg-slate-950/60 rounded-2xl border border-slate-900 overflow-hidden shadow-[0_12px_35px_rgba(2,6,23,0.7)]">
-            <div className="p-6 space-y-4">
-              <div className="flex justify-between items-start">
-                <div>
-                  <h3 className="text-xl font-bold text-white">{plan.name}</h3>
-                  <p className="text-sm text-slate-500">{plan.slug}</p>
-                </div>
-                <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${plan.is_active ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' : 'bg-slate-900 text-slate-400 border-slate-700'
-                  }`}>
-                  {plan.is_active ? 'Active' : 'Inactive'}
-                </span>
-              </div>
-
-              <p className="text-slate-400 text-sm">{plan.description || 'No description'}</p>
-
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm text-slate-400">
-                  <span>vCPU</span>
-                  <span className="font-semibold text-white">{plan.vcpu} cores</span>
-                </div>
-                <div className="flex justify-between text-sm text-slate-400">
-                  <span>RAM</span>
-                  <span className="font-semibold text-white">{plan.ram_gb} GB</span>
-                </div>
-                <div className="flex justify-between text-sm text-slate-400">
-                  <span>Storage</span>
-                  <span className="font-semibold text-white">{plan.storage_gb} GB SSD</span>
-                </div>
-                <div className="flex justify-between text-sm text-slate-400">
-                  <span>Bandwidth</span>
-                  <span className="font-semibold text-white">{plan.bandwidth_gb} GB</span>
-                </div>
-              </div>
-
-              <div className="border-t border-slate-900 pt-4">
-                <p className="text-2xl font-bold text-cyan-300">{formatCurrency(plan.base_price)}</p>
-                <p className="text-xs text-slate-500">per month</p>
-              </div>
-            </div>
-
-            <div className="bg-slate-900/70 px-6 py-3 flex justify-end gap-2 border-t border-slate-900">
-              <button
-                onClick={() => openEditModal(plan)}
-                className="p-2 text-cyan-300 hover:bg-cyan-500/10 rounded"
-                title="Edit"
-              >
-                <Edit className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => handleDelete(plan.id)}
-                className="p-2 text-rose-400 hover:bg-rose-500/10 rounded"
-                title="Delete"
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
+        {plans.length === 0 && (
+          <div className="text-center py-12 text-slate-500">
+            <Server className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No plans found</p>
           </div>
-        ))}
+        )}
       </div>
-
-      {filteredPlans.length === 0 && (
-        <div className="text-center py-12 text-slate-400 bg-slate-950/60 rounded-2xl border border-slate-900 shadow-[0_12px_35px_rgba(2,6,23,0.7)]">
-          <Package className="w-12 h-12 mx-auto mb-4 text-slate-600" />
-          <p>No plans found</p>
-        </div>
-      )}
-
-      {/* Add/Edit Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-slate-950 rounded-2xl border border-slate-900 max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-[0_25px_70px_rgba(0,0,0,0.7)]">
-            <div className="p-6 space-y-4">
-              <h2 className="text-2xl font-bold text-white">{editingPlan ? 'Edit Plan' : 'Add New Plan'}</h2>
-              <form onSubmit={handleSubmit} className="space-y-4 text-white">
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Name</label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Slug</label>
-                    <input
-                      type="text"
-                      value={formData.slug}
-                      onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Plan Type</label>
-                  <select
-                    value={formData.plan_type}
-                    onChange={(e) => setFormData({ ...formData, plan_type: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                    required
-                  >
-                    <option value="vps">VPS - Virtual Private Server</option>
-                    <option value="shared">Shared Hosting</option>
-                    <option value="dedicated">Dedicated Server</option>
-                    <option value="cloud">Cloud Hosting</option>
-                    <option value="reseller">Reseller Hosting</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
-                  <textarea
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">vCPU</label>
-                    <input
-                      type="number"
-                      value={formData.vcpu}
-                      onChange={(e) => setFormData({ ...formData, vcpu: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                      min="1"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">RAM (GB)</label>
-                    <input
-                      type="number"
-                      value={formData.ram_gb}
-                      onChange={(e) => setFormData({ ...formData, ram_gb: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                      min="1"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Storage (GB)</label>
-                    <input
-                      type="number"
-                      value={formData.storage_gb}
-                      onChange={(e) => setFormData({ ...formData, storage_gb: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                      min="1"
-                      required
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-1">Bandwidth (GB)</label>
-                    <input
-                      type="number"
-                      value={formData.bandwidth_gb}
-                      onChange={(e) => setFormData({ ...formData, bandwidth_gb: parseInt(e.target.value) })}
-                      className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                      min="1"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Base Price (INR/month)</label>
-                  <input
-                    type="number"
-                    value={formData.base_price}
-                    onChange={(e) => handleBasePriceChange(parseFloat(e.target.value) || 0)}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                    min="0"
-                    step="1"
-                    required
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Changing base price auto-calculates all pricing tiers</p>
-                </div>
-
-                {/* Pricing Tiers Section */}
-                <div className="border border-slate-800 rounded-lg p-4 space-y-4">
-                  <h3 className="text-sm font-semibold text-cyan-400">Pricing Tiers (Auto-calculated, override if needed)</h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Monthly</label>
-                      <input
-                        type="number"
-                        value={formData.monthly_price}
-                        onChange={(e) => setFormData({ ...formData, monthly_price: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
-                        min="0"
-                        step="any"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Quarterly (5% off)</label>
-                      <input
-                        type="number"
-                        value={formData.quarterly_price}
-                        onChange={(e) => setFormData({ ...formData, quarterly_price: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
-                        min="0"
-                        step="any"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Semi-Annual (8% off)</label>
-                      <input
-                        type="number"
-                        value={formData.semiannual_price}
-                        onChange={(e) => setFormData({ ...formData, semiannual_price: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
-                        min="0"
-                        step="any"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Annual (10% off)</label>
-                      <input
-                        type="number"
-                        value={formData.annual_price}
-                        onChange={(e) => setFormData({ ...formData, annual_price: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
-                        min="0"
-                        step="any"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Biennial (15% off)</label>
-                      <input
-                        type="number"
-                        value={formData.biennial_price}
-                        onChange={(e) => setFormData({ ...formData, biennial_price: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
-                        min="0"
-                        step="any"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-medium text-slate-400 mb-1">Triennial (20% off)</label>
-                      <input
-                        type="number"
-                        value={formData.triennial_price}
-                        onChange={(e) => setFormData({ ...formData, triennial_price: parseFloat(e.target.value) || 0 })}
-                        className="w-full px-2 py-1.5 bg-slate-900 border border-slate-800 rounded text-sm focus:ring-2 focus:ring-cyan-500"
-                        min="0"
-                        step="any"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-slate-300 mb-1">Features (one per line)</label>
-                  <textarea
-                    value={formData.features}
-                    onChange={(e) => setFormData({ ...formData, features: e.target.value })}
-                    className="w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg focus:ring-2 focus:ring-cyan-500"
-                    rows={4}
-                    placeholder="24/7 Support&#10;SSD Storage&#10;Free SSL"
-                  />
-                </div>
-
-                <div className="flex items-center gap-6 text-slate-300">
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_active}
-                      onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })}
-                      className="mr-2 rounded border-slate-600 text-cyan-500 focus:ring-cyan-500 bg-slate-900"
-                    />
-                    <label className="text-sm font-medium">Active</label>
-                  </div>
-                  <div className="flex items-center">
-                    <input
-                      type="checkbox"
-                      checked={formData.is_featured}
-                      onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })}
-                      className="mr-2 rounded border-slate-600 text-amber-500 focus:ring-amber-500 bg-slate-900"
-                    />
-                    <label className="text-sm font-medium">Featured</label>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2 pt-4">
-                  <button
-                    type="button"
-                    onClick={() => { setShowAddModal(false); setEditingPlan(null); }}
-                    className="px-4 py-2 border border-slate-700 rounded-lg hover:bg-slate-900 text-slate-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-400 hover:to-blue-400"
-                  >
-                    {editingPlan ? 'Update' : 'Create'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
+
+// ========== ADDONS CONTENT COMPONENT ==========
+interface AddonsContentProps {
+  addons: AddonData[];
+  loading: boolean;
+  searchTerm: string;
+  setSearchTerm: (term: string) => void;
+  categoryFilter: string;
+  setCategoryFilter: (category: string) => void;
+  onAdd: () => void;
+  onEdit: (addon: AddonData) => void;
+  onDelete: (id: number) => void;
+  formatCurrency: (amount: number) => string;
+  getCategoryBadge: (category: string) => string;
+}
+
+function AddonsContent({ addons, loading, searchTerm, setSearchTerm, categoryFilter, setCategoryFilter, onAdd, onEdit, onDelete, formatCurrency, getCategoryBadge }: AddonsContentProps) {
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
+      </div>
+    );
+  }
+
+  const categories = [
+    { value: 'all', label: 'All Categories' },
+    { value: 'storage', label: 'Storage' },
+    { value: 'bandwidth', label: 'Bandwidth' },
+    { value: 'ip_address', label: 'IP Address' },
+    { value: 'control_panel', label: 'Control Panel' },
+    { value: 'backup', label: 'Backup' },
+    { value: 'ssl', label: 'SSL' },
+    { value: 'support', label: 'Support' },
+    { value: 'management', label: 'Management' },
+    { value: 'security', label: 'Security' },
+    { value: 'cpu', label: 'CPU' },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-between items-center gap-4 flex-wrap">
+        <div className="relative flex-1 min-w-[250px] max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-5 h-5" />
+          <input
+            type="text"
+            placeholder="Search addons..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500"
+          />
+        </div>
+        <div className="flex gap-3">
+          <select
+            value={categoryFilter}
+            onChange={(e) => setCategoryFilter(e.target.value)}
+            className="px-4 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500"
+          >
+            {categories.map(cat => (
+              <option key={cat.value} value={cat.value}>{cat.label}</option>
+            ))}
+          </select>
+          <button onClick={onAdd} className="flex items-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition">
+            <Plus className="w-4 h-4" />
+            Add Addon
+          </button>
+        </div>
+      </div>
+
+      <div className="overflow-x-auto rounded-lg border border-slate-800">
+        <table className="min-w-full divide-y divide-slate-800">
+          <thead className="bg-slate-900/50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Addon Name</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Category</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Price</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Billing</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-slate-400 uppercase">Status</th>
+              <th className="px-6 py-3 text-right text-xs font-medium text-slate-400 uppercase">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-800">
+            {addons.map((addon) => (
+              <tr key={addon.id} className="hover:bg-slate-900/30">
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-white">{addon.name}</div>
+                  <div className="text-sm text-slate-500">{addon.slug}</div>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full border ${getCategoryBadge(addon.category)}`}>
+                    {addon.category.replace('_', ' ').toUpperCase()}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <div className="text-sm font-medium text-white">{formatCurrency(addon.price)}</div>
+                  {addon.unit_label && <div className="text-xs text-slate-500">per {addon.unit_label}</div>}
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    {addon.billing_type.replace('_', ' ').toUpperCase()}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap">
+                  <span className={`px-2 py-1 text-xs font-semibold rounded-full ${addon.is_active ? 'bg-green-500/10 text-green-400' : 'bg-red-500/10 text-red-400'}`}>
+                    {addon.is_active ? 'Active' : 'Inactive'}
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-right text-sm">
+                  <div className="flex items-center justify-end gap-2">
+                    <button onClick={() => onEdit(addon)} className="p-1 text-blue-400 hover:text-blue-300 transition"><Edit className="w-4 h-4" /></button>
+                    <button onClick={() => onDelete(addon.id)} className="p-1 text-red-400 hover:text-red-300 transition"><Trash2 className="w-4 h-4" /></button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {addons.length === 0 && (
+          <div className="text-center py-12 text-slate-500">
+            <Package className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <p>No addons found</p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ========== PLAN MODAL COMPONENT ==========
+interface PlanModalProps {
+  isEditing: boolean;
+  formData: any;
+  setFormData: (data: any) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onClose: () => void;
+}
+
+function PlanModal({ isEditing, formData, setFormData, onSubmit, onClose }: PlanModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-slate-950 rounded-xl border border-slate-800 max-w-4xl w-full my-8">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-white">{isEditing ? 'Edit Plan' : 'Add New Plan'}</h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
+          </div>
+          <form onSubmit={onSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Plan Name</label>
+                <input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Slug</label>
+                <input type="text" required value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-slate-300 mb-1">Description</label>
+              <textarea rows={2} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" />
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Plan Type</label>
+                <select value={formData.plan_type} onChange={(e) => setFormData({ ...formData, plan_type: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500">
+                  <option value="vps">VPS</option>
+                  <option value="shared">Shared</option>
+                  <option value="dedicated">Dedicated</option>
+                  <option value="cloud">Cloud</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">vCPU</label>
+                <input type="number" min="1" required value={formData.vcpu} onChange={(e) => setFormData({ ...formData, vcpu: parseInt(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">RAM (GB)</label>
+                <input type="number" min="1" required value={formData.ram_gb} onChange={(e) => setFormData({ ...formData, ram_gb: parseInt(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Storage (GB)</label>
+                <input type="number" min="1" required value={formData.storage_gb} onChange={(e) => setFormData({ ...formData, storage_gb: parseInt(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+              <div><label className="block text-xs text-slate-400 mb-1">Base Price (₹)</label><input type="number" step="any" required value={formData.base_price} onChange={(e) => setFormData({ ...formData, base_price: parseFloat(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" /></div>
+              <div><label className="block text-xs text-slate-400 mb-1">Monthly (₹)</label><input type="number" step="any" required value={formData.monthly_price} onChange={(e) => setFormData({ ...formData, monthly_price: parseFloat(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" /></div>
+              <div><label className="block text-xs text-slate-400 mb-1">Annual (₹)</label><input type="number" step="any" required value={formData.annual_price} onChange={(e) => setFormData({ ...formData, annual_price: parseFloat(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" /></div>
+            </div>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} className="rounded border-slate-700 text-cyan-600 focus:ring-cyan-500" />Active</label>
+              <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={formData.is_featured} onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })} className="rounded border-slate-700 text-cyan-600 focus:ring-cyan-500" />Featured</label>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={onClose} className="px-4 py-2 border border-slate-800 rounded-lg text-slate-300 hover:bg-slate-900 transition">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition">{isEditing ? 'Update Plan' : 'Create Plan'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ========== ADDON MODAL COMPONENT ==========
+interface AddonModalProps {
+  isEditing: boolean;
+  formData: any;
+  setFormData: (data: any) => void;
+  onSubmit: (e: React.FormEvent) => void;
+  onClose: () => void;
+}
+
+function AddonModal({ isEditing, formData, setFormData, onSubmit, onClose }: AddonModalProps) {
+  return (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4 overflow-y-auto">
+      <div className="bg-slate-950 rounded-xl border border-slate-800 max-w-3xl w-full my-8">
+        <div className="p-6">
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-2xl font-bold text-white">{isEditing ? 'Edit Addon' : 'Add New Addon'}</h2>
+            <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl">&times;</button>
+          </div>
+          <form onSubmit={onSubmit} className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Addon Name *</label><input type="text" required value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" placeholder="e.g., Extra Storage" /></div>
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Slug *</label><input type="text" required value={formData.slug} onChange={(e) => setFormData({ ...formData, slug: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" placeholder="e.g., extra-storage-50gb" /></div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Category *</label>
+                <select value={formData.category} onChange={(e) => setFormData({ ...formData, category: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500">
+                  <option value="storage">Storage</option>
+                  <option value="bandwidth">Bandwidth</option>
+                  <option value="ip_address">IP Address</option>
+                  <option value="control_panel">Control Panel</option>
+                  <option value="backup">Backup</option>
+                  <option value="ssl">SSL</option>
+                  <option value="support">Support</option>
+                  <option value="management">Management</option>
+                  <option value="security">Security</option>
+                  <option value="cpu">CPU</option>
+                </select>
+              </div>
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Description</label><textarea rows={1} value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" placeholder="Brief description" /></div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Price (₹) *</label><input type="number" step="0.01" min="0" required value={formData.price} onChange={(e) => setFormData({ ...formData, price: parseFloat(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" /></div>
+              <div>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Billing Type *</label>
+                <select value={formData.billing_type} onChange={(e) => setFormData({ ...formData, billing_type: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500">
+                  <option value="monthly">Monthly</option>
+                  <option value="annual">Annual</option>
+                  <option value="one_time">One Time</option>
+                  <option value="per_unit">Per Unit</option>
+                </select>
+              </div>
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Unit Label</label><input type="text" value={formData.unit_label} onChange={(e) => setFormData({ ...formData, unit_label: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" placeholder="e.g., GB, IP, TB" /></div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Min Quantity</label><input type="number" min="0" value={formData.min_quantity} onChange={(e) => setFormData({ ...formData, min_quantity: parseInt(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" /></div>
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Max Quantity</label><input type="number" min="0" value={formData.max_quantity || ''} onChange={(e) => setFormData({ ...formData, max_quantity: e.target.value ? parseInt(e.target.value) : null })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" placeholder="Unlimited" /></div>
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Default Quantity</label><input type="number" min="0" value={formData.default_quantity} onChange={(e) => setFormData({ ...formData, default_quantity: parseInt(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" /></div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Sort Order</label><input type="number" value={formData.sort_order} onChange={(e) => setFormData({ ...formData, sort_order: parseInt(e.target.value) })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" /></div>
+              <div><label className="block text-sm font-medium text-slate-300 mb-1">Icon Name</label><input type="text" value={formData.icon} onChange={(e) => setFormData({ ...formData, icon: e.target.value })} className="w-full px-3 py-2 border border-slate-800 rounded-lg bg-slate-950 text-white focus:ring-2 focus:ring-cyan-500" placeholder="e.g., database, server" /></div>
+            </div>
+            <div className="flex gap-6">
+              <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={formData.is_active} onChange={(e) => setFormData({ ...formData, is_active: e.target.checked })} className="rounded border-slate-700 text-cyan-600 focus:ring-cyan-500" />Active</label>
+              <label className="flex items-center gap-2 text-sm text-slate-300"><input type="checkbox" checked={formData.is_featured} onChange={(e) => setFormData({ ...formData, is_featured: e.target.checked })} className="rounded border-slate-700 text-cyan-600 focus:ring-cyan-500" />Featured</label>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button type="button" onClick={onClose} className="px-4 py-2 border border-slate-800 rounded-lg text-slate-300 hover:bg-slate-900 transition">Cancel</button>
+              <button type="submit" className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 transition">{isEditing ? 'Update Addon' : 'Create Addon'}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  );
+}
+
