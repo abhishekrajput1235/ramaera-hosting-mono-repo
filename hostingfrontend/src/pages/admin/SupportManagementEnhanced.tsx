@@ -9,7 +9,7 @@ import {
   Send
 } from 'lucide-react';
 import { AdminPageHeader } from '../../components/admin/AdminPageHeader';
-import { API_BASE_URL } from '../../lib/api';
+import api from '../../lib/api';
 
 interface Ticket {
   id: number;
@@ -78,13 +78,11 @@ export function SupportManagementEnhanced() {
       if (priorityFilter !== 'all') params.append('priority', priorityFilter);
       if (assignedFilter) params.append('assigned_to', assignedFilter.toString());
 
-      const response = await fetch(`${API_BASE_URL}/api/v1/support/admin/tickets?${params}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      });
-      const data = await response.json();
-      setTickets(data);
+      const data = await api.get(`/api/v1/support/admin/tickets?${params}`);
+      setTickets(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load tickets:', error);
+      setTickets([]);
     } finally {
       setLoading(false);
     }
@@ -92,23 +90,24 @@ export function SupportManagementEnhanced() {
 
   const loadEmployees = async () => {
     try {
-      const response = await fetch(`${API_BASE_URL}/api/v1/support/admin/employees`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      });
-      const data = await response.json();
-      setEmployees(data);
+      const data = await api.get('/api/v1/support/admin/employees');
+      setEmployees(Array.isArray(data) ? data : []);
     } catch (error) {
       console.error('Failed to load employees:', error);
+      setEmployees([]);
     }
   };
 
   const loadTicketDetail = async (ticketId: number) => {
     try {
       setDetailsLoading(true);
-      const response = await fetch(`${API_BASE_URL}/api/v1/support/tickets/${ticketId}`, {
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      });
-      const data = await response.json();
+      // Find the ticket to get its ticket_number
+      const ticket = tickets.find(t => t.id === ticketId);
+      if (!ticket) {
+        console.error('Ticket not found in list');
+        return;
+      }
+      const data = await api.get(`/api/v1/support/tickets/${ticket.ticket_number}`) as TicketDetail;
       setSelectedTicket(data);
     } catch (error) {
       console.error('Failed to load ticket:', error);
@@ -119,10 +118,7 @@ export function SupportManagementEnhanced() {
 
   const handleAssignTicket = async (ticketId: number, employeeId: number) => {
     try {
-      await fetch(`${API_BASE_URL}/api/v1/support/admin/tickets/${ticketId}/assign?employee_id=${employeeId}`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      });
+      await api.put(`/api/v1/support/admin/tickets/${ticketId}/assign?employee_id=${employeeId}`);
       alert('Ticket assigned successfully');
       await loadTickets();
       await loadTicketDetail(ticketId);
@@ -134,10 +130,9 @@ export function SupportManagementEnhanced() {
 
   const handleUpdateStatus = async (ticketId: number, newStatus: string) => {
     try {
-      await fetch(`${API_BASE_URL}/api/v1/support/tickets/${ticketId}/status?new_status=${newStatus}`, {
-        method: 'PUT',
-        headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
-      });
+      // Use ticket_number for the API call
+      if (!selectedTicket) return;
+      await api.put(`/api/v1/support/tickets/${selectedTicket.ticket_number}/status?new_status=${newStatus}`);
       alert('Status updated successfully');
       await loadTickets();
       await loadTicketDetail(ticketId);
@@ -151,16 +146,9 @@ export function SupportManagementEnhanced() {
     if (!replyMessage.trim() || !selectedTicket) return;
 
     try {
-      await fetch(`${API_BASE_URL}/api/v1/support/tickets/${selectedTicket.id}/messages`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
-        },
-        body: JSON.stringify({
-          message: replyMessage,
-          is_internal_note: isInternalNote
-        })
+      await api.post(`/api/v1/support/tickets/${selectedTicket.ticket_number}/messages`, {
+        message: replyMessage,
+        is_internal_note: isInternalNote
       });
 
       setReplyMessage('');
@@ -401,11 +389,11 @@ export function SupportManagementEnhanced() {
                   <select
                     value={selectedTicket.assigned_to || ''}
                     onChange={(e) => e.target.value && handleAssignTicket(selectedTicket.id, Number(e.target.value))}
-                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                    className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-transparent"
                   >
-                    <option value="">Unassigned</option>
+                    <option value="" className='bg-transparent'>Unassigned</option>
                     {employees.map((emp) => (
-                      <option key={emp.id} value={emp.id}>
+                      <option key={emp.id} value={emp.id} className='bg-transparent'>
                         {emp.full_name} ({emp.active_tickets} active)
                       </option>
                     ))}
@@ -418,9 +406,9 @@ export function SupportManagementEnhanced() {
                     onChange={(e) => handleUpdateStatus(selectedTicket.id, e.target.value)}
                     className="mt-1 w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-950/60"
                   >
-                    <option value="open">Open</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="closed">Closed</option>
+                    <option value="open" className='bg-transparent'>Open</option>
+                    <option value="in_progress" className='bg-transparent'>In Progress</option>
+                    <option value="closed" className='bg-transparent'>Closed</option>
                   </select>
                 </div>
                 <div>
@@ -431,9 +419,9 @@ export function SupportManagementEnhanced() {
                 </div>
               </div>
 
-              <div className="mt-6 p-4 border border-slate-100 rounded-2xl bg-slate-50">
-                <div className="flex items-center gap-3 mb-2">
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white">
+              <div className="mt-6 p-4 border border-slate-100 rounded-2xl bg-transparent">
+                <div className="flex items-center gap-3 mb-2 bg-transparent">
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-r from-cyan-500 to-blue-500 flex items-center justify-center text-white bg-transparent">
                     <UserIcon className="h-5 w-5" />
                   </div>
                   <div>
@@ -452,10 +440,10 @@ export function SupportManagementEnhanced() {
                       <div
                         key={message.id}
                         className={`p-4 rounded-2xl border text-sm ${message.is_internal_note
-                            ? 'bg-purple-50 border-purple-100'
-                            : message.is_staff_reply
-                              ? 'bg-cyan-50 border-cyan-100'
-                              : 'bg-slate-50 border-slate-200'
+                          ? 'bg-purple-50 border-purple-100'
+                          : message.is_staff_reply
+                            ? 'bg-cyan-50 border-cyan-100'
+                            : 'bg-slate-50 border-slate-200'
                           }`}
                       >
                         <div className="flex items-center justify-between mb-2 text-xs text-slate-500">
@@ -487,7 +475,7 @@ export function SupportManagementEnhanced() {
                       type="checkbox"
                       checked={isInternalNote}
                       onChange={(e) => setIsInternalNote(e.target.checked)}
-                      className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500"
+                      className="rounded border-slate-300 text-cyan-600 focus:ring-cyan-500 bg-transparent"
                     />
                     Internal note (private)
                   </label>
@@ -496,7 +484,7 @@ export function SupportManagementEnhanced() {
                     onChange={(e) => setReplyMessage(e.target.value)}
                     rows={3}
                     placeholder={isInternalNote ? 'Add an internal note...' : 'Write a reply to the customer...'}
-                    className="w-full border border-slate-200 rounded-2xl p-4 text-sm text-slate-700 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                    className="w-full border border-slate-200 rounded-2xl p-4 text-sm text-slate-50 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-transparent"
                   />
                   <button
                     onClick={handleSendReply}

@@ -86,7 +86,7 @@ export function SupportEnhanced() {
     try {
       setLoading(true);
       const response: any = await api.getSupportTickets({ status: statusFilter !== 'all' ? statusFilter : undefined });
-      
+
       // Transform backend data to match frontend format
       const transformedTickets: SupportTicketData[] = (response || []).map((ticket: any) => ({
         id: ticket.id,
@@ -100,7 +100,7 @@ export function SupportEnhanced() {
         description: ticket.description,
         department: ticket.department
       }));
-      
+
       setTickets(transformedTickets);
     } catch (error) {
       console.error('Failed to load tickets:', error);
@@ -112,8 +112,16 @@ export function SupportEnhanced() {
   const loadTicketDetail = async (ticketId: string) => {
     try {
       setLoading(true);
-      const response = await api.getSupportTicket(ticketId);
-      
+      // Find the ticket to get its ticket_number
+      const ticket = tickets.find(t => t.id === ticketId);
+      if (!ticket) {
+        console.error('Ticket not found in list');
+        alert('Failed to load ticket details: Ticket not found');
+        return;
+      }
+
+      const response = await api.getSupportTicket(ticket.ticket_number);
+
       // Load attachments to group with messages
       const token = localStorage.getItem('access_token');
       const attachmentsResponse = await fetch(
@@ -122,13 +130,13 @@ export function SupportEnhanced() {
           headers: { 'Authorization': `Bearer ${token}` }
         }
       );
-      
+
       const attachments = attachmentsResponse.ok ? await attachmentsResponse.json() : [];
-      
+
       // Group attachments by message_id
       const messageAttachments: Record<number, Attachment[]> = {};
       const pendingAttachmentsTemp: number[] = [];
-      
+
       attachments.forEach((att: Attachment) => {
         if (att.status === 'pending') {
           pendingAttachmentsTemp.push(att.id);
@@ -139,7 +147,7 @@ export function SupportEnhanced() {
           messageAttachments[att.message_id].push(att);
         }
       });
-      
+
       // Add attachments to messages
       if (response.messages) {
         response.messages = response.messages.map((msg: TicketMessage) => ({
@@ -147,7 +155,7 @@ export function SupportEnhanced() {
           attachments: messageAttachments[msg.id] || []
         }));
       }
-      
+
       setSelectedTicket(response);
       setPendingAttachments(pendingAttachmentsTemp);
       setActiveTab('detail');
@@ -161,7 +169,7 @@ export function SupportEnhanced() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     try {
       setSubmitting(true);
       await api.createSupportTicket({
@@ -170,7 +178,7 @@ export function SupportEnhanced() {
         priority: formData.priority,
         department: formData.department
       });
-      
+
       // Reset form and reload tickets
       setFormData({
         subject: '',
@@ -178,10 +186,10 @@ export function SupportEnhanced() {
         department: 'technical',
         message: '',
       });
-      
+
       setActiveTab('tickets');
       await loadTickets();
-      
+
       alert('Ticket created successfully!');
     } catch (error) {
       console.error('Failed to create ticket:', error);
@@ -196,9 +204,9 @@ export function SupportEnhanced() {
 
     try {
       const token = localStorage.getItem('access_token');
-      
-      // Step 1: Send the message
-      const response = await fetch(`${API_BASE_URL}/api/v1/support/tickets/${selectedTicket.id}/messages`, {
+
+      // Step 1: Send the message using ticket_number
+      const response = await fetch(`${API_BASE_URL}/api/v1/support/tickets/${selectedTicket.ticket_number}/messages`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -244,7 +252,7 @@ export function SupportEnhanced() {
       setPendingAttachments([]);
       setShowFileUpload(false);
       setAttachmentRefreshKey(prev => prev + 1);
-      
+
       // Reload ticket details to show new message with attachments
       await loadTicketDetail(selectedTicket.id);
     } catch (error) {
@@ -257,8 +265,15 @@ export function SupportEnhanced() {
     if (!confirm('Are you sure you want to close this ticket?')) return;
 
     try {
+      // Find the ticket to get its ticket_number
+      const ticket = tickets.find(t => t.id === ticketId) || selectedTicket;
+      if (!ticket) {
+        alert('Ticket not found');
+        return;
+      }
+
       const token = localStorage.getItem('access_token');
-      await fetch(`${API_BASE_URL}/api/v1/support/tickets/${ticketId}/status?new_status=closed`, {
+      await fetch(`${API_BASE_URL}/api/v1/support/tickets/${ticket.ticket_number}/status?new_status=closed`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -348,7 +363,7 @@ export function SupportEnhanced() {
               <ArrowLeft className="h-4 w-4" />
               <span>Back to Tickets</span>
             </button>
-            
+
             <div className="flex items-start justify-between">
               <div>
                 <div className="flex items-center space-x-3 mb-2">
@@ -367,7 +382,7 @@ export function SupportEnhanced() {
                   <p className="text-sm text-slate-400">Assigned to: {selectedTicket.assigned_to_name}</p>
                 )}
               </div>
-              
+
               {selectedTicket.status !== 'closed' && (
                 <button
                   onClick={() => handleCloseTicket(selectedTicket.id)}
@@ -400,9 +415,8 @@ export function SupportEnhanced() {
             {selectedTicket.messages && selectedTicket.messages.length > 0 ? (
               selectedTicket.messages.map((msg) => (
                 <div key={msg.id} className={`flex items-start space-x-3 ${msg.is_staff_reply ? 'flex-row-reverse space-x-reverse' : ''}`}>
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${
-                    msg.is_staff_reply ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-cyan-500 to-teal-500'
-                  }`}>
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${msg.is_staff_reply ? 'bg-gradient-to-r from-purple-500 to-pink-500' : 'bg-gradient-to-r from-cyan-500 to-teal-500'
+                    }`}>
                     <UserIcon className="h-5 w-5 text-white" />
                   </div>
                   <div className={`flex-1 ${msg.is_staff_reply ? 'text-right' : ''}`}>
@@ -411,11 +425,10 @@ export function SupportEnhanced() {
                       {msg.is_staff_reply && <span className="text-xs text-purple-400 font-semibold">STAFF</span>}
                       <span className="text-sm text-slate-400">{new Date(msg.created_at).toLocaleString()}</span>
                     </div>
-                    <div className={`p-4 rounded-lg ${
-                      msg.is_staff_reply ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-slate-950'
-                    }`}>
+                    <div className={`p-4 rounded-lg ${msg.is_staff_reply ? 'bg-purple-500/10 border border-purple-500/30' : 'bg-slate-950'
+                      }`}>
                       <p className="text-slate-300 whitespace-pre-wrap">{msg.message}</p>
-                      
+
                       {/* Show attachments for this message */}
                       {msg.attachments && msg.attachments.length > 0 && (
                         <div className="mt-3 pt-3 border-t border-cyan-500/20 space-y-2">
@@ -467,7 +480,7 @@ export function SupportEnhanced() {
               </div>
             )}
 
-            <AttachmentList 
+            <AttachmentList
               key={attachmentRefreshKey}
               ticketId={parseInt(selectedTicket.id)}
               onDelete={() => setAttachmentRefreshKey(prev => prev + 1)}
@@ -507,18 +520,17 @@ export function SupportEnhanced() {
           <div className="p-6 border-b border-cyan-500/30">
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-4">
               <h2 className="text-xl font-semibold text-white">My Tickets</h2>
-              
+
               {/* Status Filter */}
               <div className="flex items-center space-x-2">
                 {['all', 'open', 'in_progress', 'closed'].map((status) => (
                   <button
                     key={status}
                     onClick={() => setStatusFilter(status)}
-                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                      statusFilter === status
+                    className={`px-4 py-2 rounded-lg text-sm font-semibold transition ${statusFilter === status
                         ? 'bg-cyan-500 text-white'
                         : 'text-slate-400 hover:text-slate-300 hover:bg-slate-950'
-                    }`}
+                      }`}
                   >
                     {status === 'all' ? 'All' : status.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase())}
                   </button>
